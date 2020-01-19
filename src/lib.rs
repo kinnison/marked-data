@@ -1,7 +1,10 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+//! Marked YAML
+//! ===========
+//!
+//! TODO: Add nice frontmatter
+
+#![deny(missing_docs)]
+
+mod types;
+
+pub use types::*;
