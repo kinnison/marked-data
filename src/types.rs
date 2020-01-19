@@ -2,8 +2,12 @@
 //!
 
 use linked_hash_map::LinkedHashMap;
+use std::borrow::Cow;
+use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
 use yaml_rust::scanner::Marker as YamlMarker;
+use yaml_rust::Yaml as YamlNode;
 
 /// A marker for a YAML node
 ///
@@ -287,3 +291,273 @@ macro_rules! basic_traits {
 basic_traits!(MarkedScalarNode);
 basic_traits!(MarkedSequenceNode);
 basic_traits!(MarkedMappingNode);
+
+impl<T> From<T> for Node
+where
+    T: Into<MarkedScalarNode>,
+{
+    fn from(value: T) -> Node {
+        Node::Scalar(value.into())
+    }
+}
+
+impl From<MarkedSequenceNode> for Node {
+    fn from(value: MarkedSequenceNode) -> Node {
+        Node::Sequence(value)
+    }
+}
+
+impl<T> From<Vec<T>> for Node
+where
+    T: Into<Node>,
+{
+    fn from(value: Vec<T>) -> Node {
+        Node::Sequence(value.into_iter().collect())
+    }
+}
+
+impl From<MarkedMappingNode> for Node {
+    fn from(value: MarkedMappingNode) -> Node {
+        Node::Mapping(value)
+    }
+}
+
+macro_rules! node_span {
+    ($t:path) => {
+        impl $t {
+            /// Retrieve the Span from this node
+            ///
+            pub fn span(&self) -> &Span {
+                &self.span
+            }
+        }
+    };
+}
+
+node_span!(MarkedScalarNode);
+node_span!(MarkedMappingNode);
+node_span!(MarkedSequenceNode);
+
+impl Node {
+    /// Retrieve the Span from the contained Node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: Node = "foobar".into();
+    /// let span = node.span();
+    /// assert_eq!(span.start(), None);
+    /// ```
+    pub fn span(&self) -> &Span {
+        match self {
+            Node::Scalar(msn) => msn.span(),
+            Node::Sequence(msn) => msn.span(),
+            Node::Mapping(mmn) => mmn.span(),
+        }
+    }
+}
+
+impl MarkedScalarNode {
+    /// Create a new scalar node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node = MarkedScalarNode::new(Span::new_blank(), "foobar");
+    /// ```
+    pub fn new<'a, S: Into<Cow<'a, str>>>(span: Span, content: S) -> Self {
+        Self {
+            span,
+            value: content.into().into_owned(),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for MarkedScalarNode {
+    /// Convert from any borrowed string into a node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: MarkedScalarNode = "foobar".into();
+    /// ```
+    fn from(value: &'a str) -> Self {
+        Self::new(Span::new_blank(), value)
+    }
+}
+
+impl From<String> for MarkedScalarNode {
+    /// Convert from any owned string into a node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let foobar = "foobar".to_string();
+    /// let node: MarkedScalarNode = foobar.into();
+    /// ```
+    fn from(value: String) -> Self {
+        Self::new(Span::new_blank(), value)
+    }
+}
+
+impl MarkedSequenceNode {
+    /// Create a new empty sequence node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node = MarkedSequenceNode::new_empty(Span::new_blank());
+    /// ```
+    pub fn new_empty(span: Span) -> Self {
+        Self {
+            span,
+            value: Vec::new(),
+        }
+    }
+}
+
+impl<T> FromIterator<T> for MarkedSequenceNode
+where
+    T: Into<Node>,
+{
+    /// Allow collecting things into a sequence node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: MarkedSequenceNode = vec!["hello", "world"].into_iter().collect();
+    /// ```
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let value: Vec<Node> = iter.into_iter().map(Into::into).collect();
+        let span = match value.len() {
+            0 => Span::new_blank(),
+            1 => value[0].span().clone(),
+            _ => Span {
+                start: value[0].span().start,
+                end: value[value.len() - 1].span().end,
+            },
+        };
+        Self { span, value }
+    }
+}
+
+impl<T> From<Vec<T>> for MarkedSequenceNode
+where
+    T: Into<Node>,
+{
+    /// Allow converting from vectors of things to sequence nodes
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: MarkedSequenceNode = vec!["hello", "world"].into();
+    /// ```
+    fn from(value: Vec<T>) -> Self {
+        let value: Vec<Node> = value.into_iter().map(Into::into).collect();
+        let span = match value.len() {
+            0 => Span::new_blank(),
+            1 => value[0].span().clone(),
+            _ => {
+                let start = value[0].span().start;
+                let end = value[value.len() - 1].span().end;
+                Span { start, end }
+            }
+        };
+        Self { span, value }
+    }
+}
+
+impl MarkedMappingNode {
+    /// Create a new empty mapping node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node = MarkedMappingNode::new_empty(Span::new_blank());
+    /// ```
+    pub fn new_empty(span: Span) -> Self {
+        Self {
+            span,
+            value: LinkedHashMap::new(),
+        }
+    }
+}
+
+impl<T, U> FromIterator<(T, U)> for MarkedMappingNode
+where
+    T: Into<Node>,
+    U: Into<Node>,
+{
+    /// Allow collecting into a mapping node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use std::collections::HashMap;
+    /// # let mut hashmap = HashMap::new();
+    /// hashmap.insert("hello", vec!["world".to_string()]);
+    /// hashmap.insert("key", vec!["value".to_string()]);
+    /// let node: MarkedMappingNode = hashmap.into_iter().collect();
+    /// ```
+    fn from_iter<I: IntoIterator<Item = (T, U)>>(iter: I) -> Self {
+        let value: LinkedHashMap<Node, Node> = iter
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
+        let span = match value.len() {
+            0 => Span::new_blank(),
+            // Unwrap is safe because there's at least one span here
+            1 => {
+                let (k, v) = value.iter().next().unwrap();
+                Span {
+                    start: k.span().start,
+                    end: v.span().end,
+                }
+            }
+            _ => {
+                let mut iter = value.iter();
+                // Unwraps save because there's at least two spans here
+                let start = iter.next().unwrap().0.span().start;
+                let end = iter.last().unwrap().1.span().end;
+                Span { start, end }
+            }
+        };
+        Self { span, value }
+    }
+}
+
+/// Errors which could be encountered while converting from a `yaml_rust::Yaml`
+#[derive(Debug)]
+pub enum YamlConversionError {
+    /// An alias was encountered while converting
+    Alias,
+    /// A BadValue was encountered while converting
+    BadValue,
+}
+
+impl TryFrom<YamlNode> for Node {
+    type Error = YamlConversionError;
+
+    /// Convert from any `yaml_rust::Yaml` to a Node
+    ///
+    /// ```
+    /// # use yaml_rust::YamlLoader;
+    /// # use marked_yaml::types::*;
+    /// # use std::convert::TryFrom;
+    /// let docs = YamlLoader::load_from_str("[1, 2]").unwrap();
+    /// let yaml = docs.into_iter().next().unwrap();
+    /// let node = Node::try_from(yaml).unwrap();
+    /// ```
+    fn try_from(value: YamlNode) -> Result<Self, Self::Error> {
+        match value {
+            YamlNode::Alias(_) => Err(YamlConversionError::Alias),
+            YamlNode::Array(arr) => Ok(Node::Sequence(
+                arr.into_iter()
+                    .map(Node::try_from)
+                    .collect::<Result<MarkedSequenceNode, Self::Error>>()?,
+            )),
+            YamlNode::BadValue => Err(YamlConversionError::BadValue),
+            YamlNode::Boolean(b) => Ok(if b { "true".into() } else { "false".into() }),
+            YamlNode::Hash(h) => Ok(Node::Mapping(
+                h.into_iter()
+                    .map(|(k, v)| Ok((Node::try_from(k)?, Node::try_from(v)?)))
+                    .collect::<Result<MarkedMappingNode, Self::Error>>()?,
+            )),
+            YamlNode::Integer(i) => Ok(format!("{}", i).into()),
+            YamlNode::Null => Ok("null".into()),
+            YamlNode::Real(s) => Ok(s.into()),
+            YamlNode::String(s) => Ok(s.into()),
+        }
+    }
+}
