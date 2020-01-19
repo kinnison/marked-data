@@ -1,3 +1,8 @@
+//! Various basic types for YAML handling
+//!
+
+use linked_hash_map::LinkedHashMap;
+use std::hash::{Hash, Hasher};
 use yaml_rust::scanner::Marker as YamlMarker;
 
 /// A marker for a YAML node
@@ -181,3 +186,104 @@ impl Span {
         self.end.as_ref()
     }
 }
+
+/// A marked YAML node
+///
+/// **NOTE**: Nodes are considered equal even if they don't come from the
+/// same place.  *i.e. their spans are ignored for equality and hashing*
+///
+/// TODO: explain simplified YAML
+/// TODO: example
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Node {
+    /// A YAML scalar
+    ///
+    /// You can test if a node is a scalar, and retrieve it as one if you
+    /// so wish.
+    Scalar(MarkedScalarNode),
+    /// A YAML mapping
+    ///
+    /// You can test if a node is a mapping, and retrieve it as one if you
+    /// so wish.
+    Mapping(MarkedMappingNode),
+    /// A YAML sequence
+    ///
+    /// You can test if a node is a sequence, and retrieve it as one if you
+    /// so wish.
+    Sequence(MarkedSequenceNode),
+}
+
+/// A marked scalar YAML node
+///
+/// Scalar nodes are treated by this crate as strings, though a few special
+/// values are processed into the types which YAML would ascribe.  In particular
+/// strings of the value `null`, `true`, `false`, etc. are able to present as
+/// their special values to make it a bit easier for users of the crate.
+///
+/// **NOTE**: Nodes are considered equal even if they don't come from the
+/// same place.  *i.e. their spans are ignored for equality and hashing*
+///
+/// TODO: example
+#[derive(Clone, Debug)]
+pub struct MarkedScalarNode {
+    span: Span,
+    value: String,
+}
+
+/// A marked YAML mapping node
+///
+/// Mapping nodes in YAML are defined as a key/value mapping where the keys are
+/// unique and both keys and values may be YAML nodes of any kind.
+///
+/// Because *some* users of this crate may need to care about insertion order
+/// we use `linked_hash_map` for this.
+///
+/// **NOTE**: Nodes are considered equal even if they don't come from the
+/// same place.  *i.e. their spans are ignored for equality and hashing*
+///
+/// TODO: example
+#[derive(Clone, Debug)]
+pub struct MarkedMappingNode {
+    span: Span,
+    value: LinkedHashMap<Node, Node>,
+}
+
+/// A marked YAML sequence node
+///
+/// Sequence nodes in YAML are simply ordered lists of YAML nodes.
+///
+/// **NOTE**: Nodes are considered equal even if they don't come from the
+/// same place.  *i.e. their spans are ignored for equality and hashing*
+///
+/// TODO: example
+#[derive(Clone, Debug)]
+pub struct MarkedSequenceNode {
+    span: Span,
+    value: Vec<Node>,
+}
+
+macro_rules! basic_traits {
+    ($t:path) => {
+        impl PartialEq for $t {
+            fn eq(&self, other: &Self) -> bool {
+                self.value == other.value
+            }
+
+            fn ne(&self, other: &Self) -> bool {
+                self.value != other.value
+            }
+        }
+
+        impl Eq for $t {}
+
+        impl Hash for $t {
+            fn hash<H: Hasher>(&self, state: &mut H) {
+                self.value.hash(state);
+            }
+        }
+    };
+}
+
+basic_traits!(MarkedScalarNode);
+basic_traits!(MarkedSequenceNode);
+basic_traits!(MarkedMappingNode);

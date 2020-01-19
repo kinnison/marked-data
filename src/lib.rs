@@ -5,6 +5,6 @@
 
 #![deny(missing_docs)]
 
-mod types;
+pub mod types;
 
-pub use types::*;
+pub use types::{Marker, Node, Span};
