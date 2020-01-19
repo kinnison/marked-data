@@ -9,6 +9,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "marked-yaml"
 version = "0.0.1"
 dependencies = [
+ "linked-hash-map 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "yaml-rust 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

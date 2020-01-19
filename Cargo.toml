@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 # We lock the yaml-rust version down hard for now
 yaml-rust = "=0.4.3"
+# We should keep this in sync with the use from yaml-rust
+linked-hash-map = "0.5"
