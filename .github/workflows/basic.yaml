@@ -1,0 +1,65 @@
+name: Basic
+
+on:
+  pull_request:
+    branches:
+      - "*"
+  push:
+    branches:
+      - "*"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: true
+      matrix:
+        platform:
+          - ubuntu-latest
+        #        - macos-latest
+        #        - windows-latest
+        toolchain:
+          - stable
+          - beta
+          - nightly
+        include:
+          - platform: ubuntu-latest
+            toolchain: beta
+            clippyetc: true
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        name: Acquire minimal Rust ${{ matrix.toolchain }}
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+        if: "!matrix.clippyetc"
+      - uses: actions-rs/toolchain@v1
+        name: Acquire minimal Rust ${{ matrix.toolchain }} with clippy and rustfmt
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+          components: clippy, rustfmt
+        if: matrix.clippyetc
+      - uses: actions-rs/cargo@v1
+        name: Build the library in debug mode
+        with:
+          command: build
+      - uses: actions-rs/cargo@v1
+        name: Run the tests
+        with:
+          command: test
+      - uses: actions-rs/cargo@v1
+        name: Run clippy
+        with:
+          command: clippy
+        if: matrix.clippyetc
+      - uses: actions-rs/cargo@v1
+        name: Check formatting
+        with:
+          command: fmt
+          args: --all -- --check
+        if: matrix.clippyetc
