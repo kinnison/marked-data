@@ -44,6 +44,26 @@ jobs:
           override: true
           components: clippy, rustfmt
         if: matrix.clippyetc
+      - name: Determine the compiler identity
+        shell: bash
+        id: rustc
+        run: |
+          echo "::set-output name=commit_hash::$(rustc -vV | grep commit-hash | cut -b14-23)"
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo git trees
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-gits-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ matrix.target }}-${{ steps.rustc.outputs.commit_hash }}-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/cargo@v1
         name: Build the library in debug mode
         with:
@@ -63,3 +83,7 @@ jobs:
           command: fmt
           args: --all -- --check
         if: matrix.clippyetc
+      - name: Clear the cargo caches
+        run: |
+          cargo install cargo-cache --no-default-features --features ci-autoclean
+          cargo-cache
