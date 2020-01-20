@@ -225,7 +225,7 @@ pub struct MarkedScalarNode {
 /// A marked YAML mapping node
 ///
 /// Mapping nodes in YAML are defined as a key/value mapping where the keys are
-/// unique and both keys and values may be YAML nodes of any kind.
+/// unique and always scalars, whereas values may be YAML nodes of any kind.
 ///
 /// Because *some* users of this crate may need to care about insertion order
 /// we use `linked_hash_map` for this.
@@ -237,7 +237,7 @@ pub struct MarkedScalarNode {
 #[derive(Clone, Debug)]
 pub struct MarkedMappingNode {
     span: Span,
-    value: LinkedHashMap<Node, Node>,
+    value: LinkedHashMap<MarkedScalarNode, Node>,
 }
 
 /// A marked YAML sequence node
@@ -384,6 +384,22 @@ impl From<String> for MarkedScalarNode {
     }
 }
 
+impl From<bool> for MarkedScalarNode {
+    /// Convert from a boolean into a node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node = MarkedScalarNode::from(true);
+    /// ```
+    fn from(value: bool) -> Self {
+        if value {
+            "true".into()
+        } else {
+            "false".into()
+        }
+    }
+}
+
 impl Deref for MarkedScalarNode {
     type Target = str;
 
@@ -492,7 +508,7 @@ impl MarkedMappingNode {
 
 impl<T, U> FromIterator<(T, U)> for MarkedMappingNode
 where
-    T: Into<Node>,
+    T: Into<MarkedScalarNode>,
     U: Into<Node>,
 {
     /// Allow collecting into a mapping node
@@ -506,7 +522,7 @@ where
     /// let node: MarkedMappingNode = hashmap.into_iter().collect();
     /// ```
     fn from_iter<I: IntoIterator<Item = (T, U)>>(iter: I) -> Self {
-        let value: LinkedHashMap<Node, Node> = iter
+        let value: LinkedHashMap<MarkedScalarNode, Node> = iter
             .into_iter()
             .map(|(k, v)| (k.into(), v.into()))
             .collect();
@@ -539,6 +555,26 @@ pub enum YamlConversionError {
     Alias,
     /// A BadValue was encountered while converting
     BadValue,
+    /// A non-scalar value was encountered when a scalar was expected
+    NonScalar,
+}
+
+impl TryFrom<YamlNode> for MarkedScalarNode {
+    type Error = YamlConversionError;
+
+    fn try_from(value: YamlNode) -> Result<Self, Self::Error> {
+        match value {
+            YamlNode::Alias(_) => Err(YamlConversionError::Alias),
+            YamlNode::Array(_) => Err(YamlConversionError::NonScalar),
+            YamlNode::BadValue => Err(YamlConversionError::BadValue),
+            YamlNode::Boolean(b) => Ok(if b { "true".into() } else { "false".into() }),
+            YamlNode::Hash(_) => Err(YamlConversionError::NonScalar),
+            YamlNode::Integer(i) => Ok(format!("{}", i).into()),
+            YamlNode::Null => Ok("null".into()),
+            YamlNode::Real(s) => Ok(s.into()),
+            YamlNode::String(s) => Ok(s.into()),
+        }
+    }
 }
 
 impl TryFrom<YamlNode> for Node {
@@ -556,23 +592,17 @@ impl TryFrom<YamlNode> for Node {
     /// ```
     fn try_from(value: YamlNode) -> Result<Self, Self::Error> {
         match value {
-            YamlNode::Alias(_) => Err(YamlConversionError::Alias),
             YamlNode::Array(arr) => Ok(Node::Sequence(
                 arr.into_iter()
                     .map(Node::try_from)
                     .collect::<Result<MarkedSequenceNode, Self::Error>>()?,
             )),
-            YamlNode::BadValue => Err(YamlConversionError::BadValue),
-            YamlNode::Boolean(b) => Ok(if b { "true".into() } else { "false".into() }),
             YamlNode::Hash(h) => Ok(Node::Mapping(
                 h.into_iter()
-                    .map(|(k, v)| Ok((Node::try_from(k)?, Node::try_from(v)?)))
+                    .map(|(k, v)| Ok((MarkedScalarNode::try_from(k)?, Node::try_from(v)?)))
                     .collect::<Result<MarkedMappingNode, Self::Error>>()?,
             )),
-            YamlNode::Integer(i) => Ok(format!("{}", i).into()),
-            YamlNode::Null => Ok("null".into()),
-            YamlNode::Real(s) => Ok(s.into()),
-            YamlNode::String(s) => Ok(s.into()),
+            scalar => Ok(Node::Scalar(MarkedScalarNode::try_from(scalar)?)),
         }
     }
 }

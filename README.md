@@ -7,6 +7,12 @@ tags `tag:yaml.org,2002:seq`, `tag:yaml.org,2002:map`, and `tag:yaml.org,2002:st
 
 [yaml-rust]: https://crates.io/crates/yaml-rust
 
+The subset of YAML which is supported is quite deliberately limited in order
+that users of this crate will implicitly discourage complex use of YAML which
+is harder to manage user expectations with. As an example, the mapping type
+in this crate explicitly only permits scalars as keys, and since all scalars
+are treated as strings, mappings always have string keys.
+
 The primary value of this kind of representation of YAML data is to allow
 applications which want to be very explicit about where input came from an
 opportunity to do this in a way which normal YAML parsers do not allow.
