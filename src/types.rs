@@ -349,6 +349,51 @@ impl Node {
             Node::Mapping(mmn) => mmn.span(),
         }
     }
+
+    /// Retrieve the scalar from this node if there is one
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: Node = "foobar".into();
+    /// let scalar = node.as_scalar();
+    /// assert!(scalar.is_some());
+    /// ```
+    pub fn as_scalar(&self) -> Option<&MarkedScalarNode> {
+        match self {
+            Node::Scalar(msn) => Some(msn),
+            _ => None,
+        }
+    }
+
+    /// Retrieve the sequence from this node if there is one
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: Node = vec!["foobar"].into();
+    /// let sequence = node.as_sequence();
+    /// assert!(sequence.is_some());
+    /// ```
+    pub fn as_sequence(&self) -> Option<&MarkedSequenceNode> {
+        match self {
+            Node::Sequence(msn) => Some(msn),
+            _ => None,
+        }
+    }
+
+    /// Retrieve the mapping from this node if there is one
+    ///
+    /// ```
+    /// # use marked_yaml::*;
+    /// let node: Node = parse_yaml(0, "{foobar: baz}").unwrap();
+    /// let mapping = node.as_mapping();
+    /// assert!(mapping.is_some());
+    /// ```
+    pub fn as_mapping(&self) -> Option<&MarkedMappingNode> {
+        match self {
+            Node::Mapping(mmn) => Some(mmn),
+            _ => None,
+        }
+    }
 }
 
 impl MarkedScalarNode {
