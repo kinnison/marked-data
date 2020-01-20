@@ -432,6 +432,52 @@ impl MarkedScalarNode {
             value: content.into().into_owned(),
         }
     }
+
+    /// Treat the scalar node as a string
+    ///
+    /// Since scalars are always stringish, this is always safe.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: MarkedScalarNode = "foobar".into();
+    /// assert_eq!(node.as_str(), "foobar");
+    /// ```
+    pub fn as_str(&self) -> &str {
+        self.value.as_str()
+    }
+
+    /// Treat the scalar node as a boolean
+    ///
+    /// If the scalar contains any of the following then it is true:
+    ///
+    /// * `true`
+    /// * `True`
+    /// * `TRUE`
+    ///
+    /// The following are considered false:
+    ///
+    /// * `false`
+    /// * `False`
+    /// * `FALSE`
+    ///
+    /// Everything else is not a boolean and so will return None
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: MarkedScalarNode = "true".into();
+    /// assert_eq!(node.as_bool(), Some(true));
+    /// let node: MarkedScalarNode = "FALSE".into();
+    /// assert_eq!(node.as_bool(), Some(false));
+    /// let node: MarkedScalarNode = "NO".into(); // YAML boolean, but not for us
+    /// assert_eq!(node.as_bool(), None);
+    /// ```
+    pub fn as_bool(&self) -> Option<bool> {
+        match self.value.as_str() {
+            "true" | "True" | "TRUE" => Some(true),
+            "false" | "False" | "FALSE" => Some(false),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> From<&'a str> for MarkedScalarNode {
@@ -475,8 +521,8 @@ impl From<bool> for MarkedScalarNode {
     }
 }
 
-macro_rules! scalar_from_number {
-    ($t:path) => {
+macro_rules! scalar_from_to_number {
+    ($t:ident, $as:ident) => {
         impl From<$t> for MarkedScalarNode {
             doc_comment!(
                 concat!(
@@ -498,21 +544,49 @@ assert_eq!(&*node, "0");
                 }
             );
         }
+
+        impl MarkedScalarNode {
+            doc_comment!(
+                concat!(
+                    "Treat the scalar node as ",
+                    stringify!($t),
+                    r#".
+
+If this scalar node's value can be represented properly as
+a number of the right kind then return it.  This is essentially
+a shortcut for using the `FromStr` trait on the return value of
+`.as_str()`.
+
+```
+# use marked_yaml::types::*;
+let node: MarkedScalarNode = "0".into();
+assert_eq!(node.as_"#,
+                    stringify!($t),
+                    r#"(), Some(0"#,
+                    stringify!($t),
+                    r#"));
+```"#),
+                pub fn $as(&self) -> Option<$t> {
+                    use std::str::FromStr;
+                    $t::from_str(&self.value).ok()
+                }
+            );
+        }
     };
 }
 
-scalar_from_number!(i8);
-scalar_from_number!(i16);
-scalar_from_number!(i32);
-scalar_from_number!(i64);
-scalar_from_number!(i128);
-scalar_from_number!(isize);
-scalar_from_number!(u8);
-scalar_from_number!(u16);
-scalar_from_number!(u32);
-scalar_from_number!(u64);
-scalar_from_number!(u128);
-scalar_from_number!(usize);
+scalar_from_to_number!(i8, as_i8);
+scalar_from_to_number!(i16, as_i16);
+scalar_from_to_number!(i32, as_i32);
+scalar_from_to_number!(i64, as_i64);
+scalar_from_to_number!(i128, as_i128);
+scalar_from_to_number!(isize, as_isize);
+scalar_from_to_number!(u8, as_u8);
+scalar_from_to_number!(u16, as_u16);
+scalar_from_to_number!(u32, as_u32);
+scalar_from_to_number!(u64, as_u64);
+scalar_from_to_number!(u128, as_u128);
+scalar_from_to_number!(usize, as_usize);
 
 impl Deref for MarkedScalarNode {
     type Target = str;
