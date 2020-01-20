@@ -536,6 +536,16 @@ impl MarkedSequenceNode {
         }
     }
 
+    /// Create a new sequence node from a vector of nodes
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node = MarkedSequenceNode::new(Span::new_blank(), Vec::new());
+    /// ```
+    pub fn new(span: Span, value: Vec<Node>) -> Self {
+        Self { span, value }
+    }
+
     /// Get the number of entries in the node
     ///
     /// ```
@@ -609,6 +619,17 @@ impl MarkedMappingNode {
             span,
             value: LinkedHashMap::new(),
         }
+    }
+
+    /// Create a new mapping node from the given hash table
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use linked_hash_map::LinkedHashMap;
+    /// let node = MarkedMappingNode::new(Span::new_blank(), LinkedHashMap::new());
+    /// ```
+    pub fn new(span: Span, value: MappingHash) -> Self {
+        Self { span, value }
     }
 }
 
