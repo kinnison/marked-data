@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
+use std::ops::Deref;
 use yaml_rust::Yaml as YamlNode;
 
 /// A marker for a YAML node
@@ -380,6 +381,22 @@ impl From<String> for MarkedScalarNode {
     /// ```
     fn from(value: String) -> Self {
         Self::new(Span::new_blank(), value)
+    }
+}
+
+impl Deref for MarkedScalarNode {
+    type Target = str;
+
+    /// Borrow the string value inside this scalar node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use std::str::FromStr;
+    /// let truth: MarkedScalarNode = "true".into();
+    /// assert!(bool::from_str(&truth).unwrap())
+    /// ```
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
 }
 
