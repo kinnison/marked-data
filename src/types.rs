@@ -6,7 +6,6 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
-use yaml_rust::scanner::Marker as YamlMarker;
 use yaml_rust::Yaml as YamlNode;
 
 /// A marker for a YAML node
@@ -15,7 +14,7 @@ use yaml_rust::Yaml as YamlNode;
 /// TODO: example
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Marker {
-    index: usize,
+    source: usize,
     line: usize,
     column: usize,
 }
@@ -30,32 +29,34 @@ impl Marker {
     /// ```
     /// # use marked_yaml::Marker;
     /// let marker = Marker::new(0, 1, 2);
-    /// # assert_eq!(marker.index(), 0);
+    /// # assert_eq!(marker.source(), 0);
     /// # assert_eq!(marker.line(), 1);
     /// # assert_eq!(marker.column(), 2);
     /// ```
-    pub fn new(index: usize, line: usize, column: usize) -> Self {
+    pub fn new(source: usize, line: usize, column: usize) -> Self {
         Self {
-            index,
+            source,
             line,
             column,
         }
     }
 
-    /// The index into the input string at which this point exists, 0-indexed
+    /// The source index given for this marker.
     ///
     /// When parsing YAML, we record where nodes start (and often finish).
-    /// This is the byte-index into the input string where this marker resides.
+    /// This is the source index provided when parsing the YAML.  Likely this
+    /// refers to a vector of PathBuf recording where input came from, but that
+    /// is entirely up to the user of this library crate.
     ///
     /// This is likely most useful to computers, not humans.
     ///
     /// ```
     /// # use marked_yaml::Marker;
     /// # let marker = Marker::new(0, 1, 2);
-    /// assert_eq!(marker.index(), 0);
+    /// assert_eq!(marker.source(), 0);
     /// ```
-    pub fn index(&self) -> usize {
-        self.index
+    pub fn source(&self) -> usize {
+        self.source
     }
 
     /// The line number on which this marker resides, 1-indexed
@@ -86,20 +87,6 @@ impl Marker {
     /// ```
     pub fn column(&self) -> usize {
         self.column
-    }
-}
-
-/// Permit conversion from the `yaml_rust::scanner::Marker` type.
-///
-/// To ensure that documentation is consistent in this crate, we trivially
-/// convert the `yaml_rust` crate's `Marker` type to our own
-impl std::convert::From<YamlMarker> for Marker {
-    fn from(value: YamlMarker) -> Self {
-        Self {
-            index: value.index(),
-            line: value.line(),
-            column: value.col(),
-        }
     }
 }
 
