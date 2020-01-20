@@ -3,7 +3,7 @@
 
 use doc_comment::doc_comment;
 use linked_hash_map::LinkedHashMap;
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::convert::TryFrom;
 use std::fmt::{self, Display};
 use std::hash::{Hash, Hasher};
@@ -606,6 +606,12 @@ impl Deref for MarkedScalarNode {
     /// assert!(bool::from_str(&truth).unwrap())
     /// ```
     fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl Borrow<str> for MarkedScalarNode {
+    fn borrow(&self) -> &str {
         &self.value
     }
 }
