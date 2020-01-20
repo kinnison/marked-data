@@ -271,6 +271,7 @@ macro_rules! basic_traits {
                 self.value == other.value
             }
 
+            #[allow(clippy::partialeq_ne_impl)]
             fn ne(&self, other: &Self) -> bool {
                 self.value != other.value
             }
@@ -563,6 +564,17 @@ impl MarkedSequenceNode {
     pub fn len(&self) -> usize {
         self.value.len()
     }
+
+    /// Determine if the sequence is empty
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node = MarkedSequenceNode::new_empty(Span::new_blank());
+    /// assert!(node.is_empty())
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
 }
 
 impl<T> FromIterator<T> for MarkedSequenceNode
@@ -579,7 +591,7 @@ where
         let value: Vec<Node> = iter.into_iter().map(Into::into).collect();
         let span = match value.len() {
             0 => Span::new_blank(),
-            1 => value[0].span().clone(),
+            1 => *value[0].span(),
             _ => Span {
                 start: value[0].span().start,
                 end: value[value.len() - 1].span().end,
@@ -603,7 +615,7 @@ where
         let value: Vec<Node> = value.into_iter().map(Into::into).collect();
         let span = match value.len() {
             0 => Span::new_blank(),
-            1 => value[0].span().clone(),
+            1 => *value[0].span(),
             _ => {
                 let start = value[0].span().start;
                 let end = value[value.len() - 1].span().end;

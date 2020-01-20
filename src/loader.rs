@@ -273,6 +273,6 @@ pub fn parse_yaml(source: usize, yaml: &str) -> Result<Node, LoadError> {
     let mut parser = Parser::new(yaml.chars());
     parser
         .load(&mut loader, false)
-        .map_err(|e| LoadError::ScanError(e))?;
+        .map_err(LoadError::ScanError)?;
     loader.finish()
 }
