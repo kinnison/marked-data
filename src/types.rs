@@ -223,6 +223,8 @@ pub struct MarkedScalarNode {
     value: String,
 }
 
+pub(crate) type MappingHash = LinkedHashMap<MarkedScalarNode, Node>;
+
 /// A marked YAML mapping node
 ///
 /// Mapping nodes in YAML are defined as a key/value mapping where the keys are
@@ -238,7 +240,7 @@ pub struct MarkedScalarNode {
 #[derive(Clone, Debug)]
 pub struct MarkedMappingNode {
     span: Span,
-    value: LinkedHashMap<MarkedScalarNode, Node>,
+    value: MappingHash,
 }
 
 /// A marked YAML sequence node
@@ -626,7 +628,7 @@ where
     /// let node: MarkedMappingNode = hashmap.into_iter().collect();
     /// ```
     fn from_iter<I: IntoIterator<Item = (T, U)>>(iter: I) -> Self {
-        let value: LinkedHashMap<MarkedScalarNode, Node> = iter
+        let value: MappingHash = iter
             .into_iter()
             .map(|(k, v)| (k.into(), v.into()))
             .collect();
