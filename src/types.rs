@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 use std::fmt::{self, Display};
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use yaml_rust::Yaml as YamlNode;
 
 /// A marker for a YAML node
@@ -553,27 +553,18 @@ impl MarkedSequenceNode {
     pub fn new(span: Span, value: Vec<Node>) -> Self {
         Self { span, value }
     }
+}
 
-    /// Get the number of entries in the node
-    ///
-    /// ```
-    /// # use marked_yaml::types::*;
-    /// let node: MarkedSequenceNode = (0..5).map(|_| "Hello").collect();
-    /// assert_eq!(node.len(), 5);
-    /// ```
-    pub fn len(&self) -> usize {
-        self.value.len()
+impl Deref for MarkedSequenceNode {
+    type Target = Vec<Node>;
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
+}
 
-    /// Determine if the sequence is empty
-    ///
-    /// ```
-    /// # use marked_yaml::types::*;
-    /// let node = MarkedSequenceNode::new_empty(Span::new_blank());
-    /// assert!(node.is_empty())
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.value.is_empty()
+impl DerefMut for MarkedSequenceNode {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
     }
 }
 
@@ -649,6 +640,19 @@ impl MarkedMappingNode {
     /// ```
     pub fn new(span: Span, value: MappingHash) -> Self {
         Self { span, value }
+    }
+}
+
+impl Deref for MarkedMappingNode {
+    type Target = MappingHash;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl DerefMut for MarkedMappingNode {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
     }
 }
 
