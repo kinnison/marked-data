@@ -633,6 +633,73 @@ impl MarkedSequenceNode {
     pub fn new(span: Span, value: Vec<Node>) -> Self {
         Self { span, value }
     }
+
+    /// Get the node at the given index
+    ///
+    /// If the index is invalid then None will be returned
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let seq: MarkedSequenceNode = vec!["foobar"].into_iter().collect();
+    /// assert_eq!(seq.get_node(0)
+    ///     .and_then(Node::as_scalar)
+    ///     .map(MarkedScalarNode::as_str)
+    ///     .unwrap(),
+    ///     "foobar");
+    pub fn get_node(&self, index: usize) -> Option<&Node> {
+        self.value.get(index)
+    }
+
+    /// Get the scalar at the given index
+    ///
+    /// If the index is invalid, or the node at that index is not a scalar
+    /// node, then None will be returned.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let seq: MarkedSequenceNode = vec!["foobar"].into_iter().collect();
+    /// assert_eq!(seq.get_scalar(0)
+    ///     .map(MarkedScalarNode::as_str)
+    ///     .unwrap(),
+    ///     "foobar");
+    /// ```
+    pub fn get_scalar(&self, index: usize) -> Option<&MarkedScalarNode> {
+        self.get_node(index).and_then(Node::as_scalar)
+    }
+
+    /// Get the sequence at the given index
+    ///
+    /// If the index is invalid, or the node at that index is not a sequence
+    /// node, then None will be returned.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let seq: MarkedSequenceNode = vec![vec!["foobar"]].into_iter().collect();
+    /// assert_eq!(seq.get_sequence(0)
+    ///     .and_then(|s| s.get_scalar(0))
+    ///     .map(MarkedScalarNode::as_str)
+    ///     .unwrap(),
+    ///     "foobar");
+    /// ```
+    pub fn get_sequence(&self, index: usize) -> Option<&MarkedSequenceNode> {
+        self.get_node(index).and_then(Node::as_sequence)
+    }
+
+    /// Get the mapping at the given index
+    ///
+    /// If the index is invalid, or the node at that index is not a mapping
+    /// node, then None will be returned.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use linked_hash_map::LinkedHashMap;
+    /// # let map: LinkedHashMap<MarkedScalarNode, Node> = LinkedHashMap::new();
+    /// let seq: MarkedSequenceNode = vec![map].into_iter().collect();
+    /// assert!(seq.get_mapping(0).is_some());
+    /// ```
+    pub fn get_mapping(&self, index: usize) -> Option<&MarkedMappingNode> {
+        self.get_node(index).and_then(Node::as_mapping)
+    }
 }
 
 impl Deref for MarkedSequenceNode {
