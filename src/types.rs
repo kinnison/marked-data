@@ -321,6 +321,12 @@ impl From<MarkedMappingNode> for Node {
     }
 }
 
+impl From<MappingHash> for Node {
+    fn from(value: MappingHash) -> Node {
+        Node::Mapping(value.into())
+    }
+}
+
 macro_rules! node_span {
     ($t:path) => {
         impl $t {
@@ -727,6 +733,12 @@ impl Deref for MarkedMappingNode {
 impl DerefMut for MarkedMappingNode {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.value
+    }
+}
+
+impl From<MappingHash> for MarkedMappingNode {
+    fn from(value: MappingHash) -> Self {
+        Self::new(Span::new_blank(), value)
     }
 }
 
