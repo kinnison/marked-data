@@ -8,6 +8,8 @@ use yaml_rust::parser::{Event, MarkedEventReceiver, Parser};
 use yaml_rust::scanner::Marker as YamlMarker;
 use yaml_rust::scanner::ScanError;
 
+use std::fmt::{self, Display};
+
 /// Errors which can occur during loading of YAML
 #[derive(Debug)]
 pub enum LoadError {
@@ -26,6 +28,23 @@ pub enum LoadError {
     /// A YAML scanner error occured
     ScanError(ScanError),
 }
+
+impl Display for LoadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use LoadError::*;
+        match self {
+            Unknown => write!(f, "Unknown error"),
+            ScanError(e) => write!(f, "Low level error: {}", e),
+            TopLevelMustBeMapping(m) => write!(f, "{}: Top level must be a mapping", m),
+            UnexpectedAnchor(m) => write!(f, "{}: Unexpected definition of anchor", m),
+            UnexpectedAlias(m) => write!(f, "{}: Unexpected use of alias", m),
+            MappingKeyMustBeScalar(m) => write!(f, "{}: Keys in mappings must be scalar", m),
+            UnexpectedTag(m) => write!(f, "{}: Unexpected use of YAML tag", m),
+        }
+    }
+}
+
+impl std::error::Error for LoadError {}
 
 #[derive(Debug)]
 enum LoaderState {
