@@ -5,6 +5,7 @@ use doc_comment::doc_comment;
 use linked_hash_map::LinkedHashMap;
 use std::borrow::Cow;
 use std::convert::TryFrom;
+use std::fmt::{self, Display};
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::ops::Deref;
@@ -89,6 +90,12 @@ impl Marker {
     /// ```
     pub fn column(&self) -> usize {
         self.column
+    }
+}
+
+impl Display for Marker {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
     }
 }
 
