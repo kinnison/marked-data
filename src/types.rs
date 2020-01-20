@@ -1,6 +1,7 @@
 //! Various basic types for YAML handling
 //!
 
+use doc_comment::doc_comment;
 use linked_hash_map::LinkedHashMap;
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -313,11 +314,17 @@ impl From<MarkedMappingNode> for Node {
 macro_rules! node_span {
     ($t:path) => {
         impl $t {
-            /// Retrieve the Span from this node
-            ///
+            doc_comment!(
+                concat!(r#"Retrieve the Span from this node.
+
+```
+# use marked_yaml::types::*;
+let node = "#, stringify!($t), r#"::new_empty(Span::new_blank());
+assert_eq!(node.span(), &Span::new_blank());
+```"#),
             pub fn span(&self) -> &Span {
                 &self.span
-            }
+            });
         }
     };
 }
@@ -345,6 +352,19 @@ impl Node {
 }
 
 impl MarkedScalarNode {
+    /// Create a new scalar node with no value
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node = MarkedScalarNode::new_empty(Span::new_blank());
+    /// ```
+    pub fn new_empty(span: Span) -> Self {
+        Self {
+            span,
+            value: String::new(),
+        }
+    }
+
     /// Create a new scalar node
     ///
     /// ```
@@ -399,6 +419,45 @@ impl From<bool> for MarkedScalarNode {
         }
     }
 }
+
+macro_rules! scalar_from_number {
+    ($t:path) => {
+        impl From<$t> for MarkedScalarNode {
+            doc_comment!(
+                concat!(
+                    "Convert from ",
+                    stringify!($t),
+                    r#" into a node
+
+```
+# use marked_yaml::types::*;
+let value: "#,
+                    stringify!($t),
+                    r#" = 0;
+let node: MarkedScalarNode = value.into();
+assert_eq!(&*node, "0");
+```"#
+                ),
+                fn from(value: $t) -> Self {
+                    format!("{}", value).into()
+                }
+            );
+        }
+    };
+}
+
+scalar_from_number!(i8);
+scalar_from_number!(i16);
+scalar_from_number!(i32);
+scalar_from_number!(i64);
+scalar_from_number!(i128);
+scalar_from_number!(isize);
+scalar_from_number!(u8);
+scalar_from_number!(u16);
+scalar_from_number!(u32);
+scalar_from_number!(u64);
+scalar_from_number!(u128);
+scalar_from_number!(usize);
 
 impl Deref for MarkedScalarNode {
     type Target = str;
@@ -567,9 +626,9 @@ impl TryFrom<YamlNode> for MarkedScalarNode {
             YamlNode::Alias(_) => Err(YamlConversionError::Alias),
             YamlNode::Array(_) => Err(YamlConversionError::NonScalar),
             YamlNode::BadValue => Err(YamlConversionError::BadValue),
-            YamlNode::Boolean(b) => Ok(if b { "true".into() } else { "false".into() }),
+            YamlNode::Boolean(b) => Ok(b.into()),
             YamlNode::Hash(_) => Err(YamlConversionError::NonScalar),
-            YamlNode::Integer(i) => Ok(format!("{}", i).into()),
+            YamlNode::Integer(i) => Ok(i.into()),
             YamlNode::Null => Ok("null".into()),
             YamlNode::Real(s) => Ok(s.into()),
             YamlNode::String(s) => Ok(s.into()),

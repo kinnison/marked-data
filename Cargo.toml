@@ -7,6 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+doc-comment = "0.3"
 # We lock the yaml-rust version down hard for now
 yaml-rust = "=0.4.3"
 # We should keep this in sync with the use from yaml-rust
