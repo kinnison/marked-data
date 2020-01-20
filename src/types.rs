@@ -794,6 +794,84 @@ impl MarkedMappingNode {
     pub fn new(span: Span, value: MappingHash) -> Self {
         Self { span, value }
     }
+
+    /// Get the node for the given string key
+    ///
+    /// If the index is not found then None is returned.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use marked_yaml::parse_yaml;
+    /// let node = parse_yaml(0, "{key: value}").unwrap();
+    /// let map = node.as_mapping().unwrap();
+    /// assert_eq!(map.get_node("key")
+    ///     .and_then(Node::as_scalar)
+    ///     .map(MarkedScalarNode::as_str)
+    ///     .unwrap(),
+    ///     "value");
+    /// ```
+    pub fn get_node(&self, index: &str) -> Option<&Node> {
+        self.value.get(index)
+    }
+
+    /// Get the scalar for the given string key
+    ///
+    /// If the key is not found, or the node for that key is not a scalar
+    /// node, then None will be returned.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use marked_yaml::parse_yaml;
+    /// let node = parse_yaml(0, "{key: value}").unwrap();
+    /// let map = node.as_mapping().unwrap();
+    /// assert_eq!(map.get_scalar("key")
+    ///     .map(MarkedScalarNode::as_str)
+    ///     .unwrap(),
+    ///     "value");
+    /// ```
+    pub fn get_scalar(&self, index: &str) -> Option<&MarkedScalarNode> {
+        self.get_node(index).and_then(Node::as_scalar)
+    }
+
+    /// Get the sequence at the given index
+    ///
+    /// If the key is not found, or the node for that key is not a sequence
+    /// node, then None will be returned.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use marked_yaml::parse_yaml;
+    /// let node = parse_yaml(0, "{key: [value]}").unwrap();
+    /// let map = node.as_mapping().unwrap();
+    /// assert_eq!(map.get_sequence("key")
+    ///     .and_then(|s| s.get_scalar(0))
+    ///     .map(MarkedScalarNode::as_str)
+    ///     .unwrap(),
+    ///     "value");
+    /// ```
+    pub fn get_sequence(&self, index: &str) -> Option<&MarkedSequenceNode> {
+        self.get_node(index).and_then(Node::as_sequence)
+    }
+
+    /// Get the mapping at the given index
+    ///
+    /// If the key is not found, or the node for that key is not a mapping
+    /// node, then None will be returned.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// # use marked_yaml::parse_yaml;
+    /// let node = parse_yaml(0, "{key: {inner: value}}").unwrap();
+    /// let map = node.as_mapping().unwrap();
+    /// assert_eq!(map.get_mapping("key")
+    ///     .and_then(|m| m.get_scalar("inner"))
+    ///     .map(MarkedScalarNode::as_str)
+    ///     .unwrap(),
+    ///     "value");
+    /// ```
+    pub fn get_mapping(&self, index: &str) -> Option<&MarkedMappingNode> {
+        self.get_node(index).and_then(Node::as_mapping)
+    }
 }
 
 impl Deref for MarkedMappingNode {
