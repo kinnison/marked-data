@@ -1,0 +1,21 @@
+# This is an example document which exercises all of the properties of
+# the marked YAML parser.  It covers scalars, mappings, and sequences, and
+# verifies that everything which *ought* to be supported is.
+
+simple: scalar
+boolean1: true
+boolean2: false
+integer: 1234
+float: 12.34
+nullvalue: null
+
+plainsequence:
+  - simple
+  - values
+  - are
+  - supported
+
+heterogenous:
+  - multiple
+  - types: of
+  - [values, are supported]
