@@ -413,6 +413,17 @@ impl MarkedSequenceNode {
             value: Vec::new(),
         }
     }
+
+    /// Get the number of entries in the node
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let node: MarkedSequenceNode = (0..5).map(|_| "Hello").collect();
+    /// assert_eq!(node.len(), 5);
+    /// ```
+    pub fn len(&self) -> usize {
+        self.value.len()
+    }
 }
 
 impl<T> FromIterator<T> for MarkedSequenceNode
