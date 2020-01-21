@@ -8,6 +8,7 @@ use yaml_rust::parser::{Event, MarkedEventReceiver, Parser};
 use yaml_rust::scanner::Marker as YamlMarker;
 use yaml_rust::scanner::ScanError;
 
+use std::error::Error;
 use std::fmt::{self, Display};
 
 /// Errors which can occur during loading of YAML
@@ -22,7 +23,7 @@ pub enum LoadError {
     /// An explicit tag was detected
     UnexpectedTag(Marker),
     /// A YAML scanner error occured
-    ScanError(ScanError),
+    ScanError(Marker, ScanError),
 }
 
 impl Display for LoadError {
@@ -33,12 +34,12 @@ impl Display for LoadError {
             UnexpectedAnchor(m) => write!(f, "{}: Unexpected definition of anchor", m),
             MappingKeyMustBeScalar(m) => write!(f, "{}: Keys in mappings must be scalar", m),
             UnexpectedTag(m) => write!(f, "{}: Unexpected use of YAML tag", m),
-            ScanError(e) => write!(f, "Low level error: {}", e),
+            ScanError(m, e) => write!(f, "{}: {}", m, e.description()),
         }
     }
 }
 
-impl std::error::Error for LoadError {}
+impl Error for LoadError {}
 
 #[derive(Debug, PartialEq, Eq)]
 enum LoaderState {
@@ -259,9 +260,10 @@ impl MarkedLoader {
 pub fn parse_yaml(source: usize, yaml: &str) -> Result<Node, LoadError> {
     let mut loader = MarkedLoader::new(source);
     let mut parser = Parser::new(yaml.chars());
-    parser
-        .load(&mut loader, false)
-        .map_err(LoadError::ScanError)?;
+    parser.load(&mut loader, false).map_err(|se| {
+        let mark = loader.marker(*se.marker());
+        LoadError::ScanError(mark, se)
+    })?;
     loader.finish()
 }
 
@@ -370,5 +372,12 @@ mod test {
             parse_yaml(0, "{foo: {? [] : {}}}"),
             Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 10)))
         );
+    }
+
+    #[test]
+    fn malformed_yaml_for_scanerror() {
+        let err = parse_yaml(0, "{");
+        assert!(err.is_err());
+        assert!(format!("{}", err.err().unwrap()).starts_with("2:1: "));
     }
 }
