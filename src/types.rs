@@ -996,7 +996,7 @@ where
 }
 
 /// Errors which could be encountered while converting from a `yaml_rust::Yaml`
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum YamlConversionError {
     /// An alias was encountered while converting
     Alias,
@@ -1051,5 +1051,143 @@ impl TryFrom<YamlNode> for Node {
             )),
             scalar => Ok(Node::Scalar(MarkedScalarNode::try_from(scalar)?)),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::super::*;
+    use super::*;
+
+    #[test]
+    fn basic_marker_checks() {
+        let marker = Marker::new(0, 1, 2);
+        assert_eq!(marker.source(), 0);
+        assert_eq!(marker.line(), 1);
+        assert_eq!(marker.column(), 2);
+        assert_eq!(format!("{}", marker), "1:2");
+        let rendered = marker.render(|n| {
+            assert_eq!(n, 0);
+            "name"
+        });
+        assert_eq!(format!("{}", rendered), "name:1:2");
+    }
+
+    #[test]
+    fn basic_span_checks() {
+        let span = Span::new_blank();
+        assert_eq!(span.start(), None);
+        assert_eq!(span.end(), None);
+        let mark = Marker::new(0, 1, 2);
+        let mark2 = Marker::new(3, 4, 5);
+        let span = Span::new_start(mark);
+        assert_eq!(span.start(), Some(&mark));
+        assert_eq!(span.end(), None);
+        let span = Span::new_with_marks(mark, mark2);
+        assert_eq!(span.start(), Some(&mark));
+        assert_eq!(span.end(), Some(&mark2));
+    }
+
+    #[test]
+    fn basic_explore_load_test() {
+        let node = parse_yaml(0, include_str!("../examples/everything.yaml")).unwrap();
+        let map = node.as_mapping().unwrap();
+        assert_eq!(node.as_scalar(), None);
+        assert_eq!(node.as_sequence(), None);
+        assert_eq!(map.get_node("XXX NOT PRESENT XXX"), None);
+        assert_eq!(map.get_scalar("mapping"), None);
+        assert_eq!(map.get_sequence("mapping"), None);
+        assert_eq!(map.get_mapping("simple"), None);
+        // This actually uses .eq()
+        assert_ne!(map.get_scalar("boolean1"), map.get_scalar("boolean2"));
+        // Whereas this uses .ne()
+        assert!(map.get_scalar("boolean1") != map.get_scalar("boolean2"));
+        // Now check the spans
+        assert_eq!(node.span(), map.span());
+        let seq = map.get_sequence("heterogenous").unwrap();
+        assert_eq!(seq.span().start(), Some(&Marker::new(0, 24, 3)));
+        assert_eq!(seq.span(), map.get_node("heterogenous").unwrap().span());
+        // Helpers for the sequence node
+        assert_eq!(seq.get_node(0), seq.get(0));
+        assert_ne!(seq.get_node(0), None);
+        assert_ne!(seq.get_scalar(0), None);
+        assert_ne!(seq.get_mapping(1), None);
+        assert_ne!(seq.get_sequence(2), None);
+    }
+
+    #[test]
+    fn basic_scalar_features() {
+        let scalar1 = MarkedScalarNode::new(Span::new_blank(), "");
+        let scalar2 = MarkedScalarNode::new_empty(Span::new_blank());
+        assert_eq!(scalar1, scalar2);
+        assert_eq!(scalar1.as_str(), "");
+        assert_eq!(scalar1.as_bool(), None);
+        assert_eq!(scalar1.as_usize(), None);
+        let truth: MarkedScalarNode = "true".into();
+        assert_eq!(truth.as_bool(), Some(true));
+        let falsehood: MarkedScalarNode = "false".to_string().into();
+        assert_eq!(falsehood.as_bool(), Some(false));
+        assert_eq!(truth, true.into());
+        assert_eq!(falsehood, false.into());
+        let zero: MarkedScalarNode = "0".into();
+        assert_eq!(zero.as_usize(), Some(0));
+        assert_eq!(zero, 0usize.into());
+        assert_eq!(&*zero, "0");
+    }
+
+    #[test]
+    fn basic_sequence_features() {
+        // For features not covered by other tests
+        let mut seq = MarkedSequenceNode::new_empty(Span::new_blank());
+        let seq2: MarkedSequenceNode = vec!["foo"].into_iter().collect();
+        let scalar: MarkedScalarNode = "foo".into();
+        seq.push(Node::from(scalar));
+        assert_eq!(seq, seq2);
+        assert_eq!(seq, vec!["foo"].into());
+        let seq3: MarkedSequenceNode = vec!["foo", "bar"].into_iter().collect();
+        seq.push(Node::from("bar"));
+        assert_eq!(seq, seq3);
+        assert_eq!(seq, vec!["foo", "bar"].into());
+    }
+
+    #[test]
+    fn basic_mapping_features() {
+        // For features not covered by other tests
+        let mut map = MarkedMappingNode::new_empty(Span::new_blank());
+        let mut hash = MappingHash::new();
+        hash.insert("foo".into(), "bar".into());
+        let map2 = MarkedMappingNode::from(hash);
+        map.insert("foo".into(), "bar".into());
+        assert_eq!(map, map2);
+        assert_eq!(map.get("foo").unwrap().as_scalar().unwrap().as_str(), "bar");
+        let map3: MarkedMappingNode = vec![("foo", "bar")].into_iter().collect();
+        assert_eq!(map, map3);
+        map.insert("baz".into(), "meta".into());
+        let map4: MarkedMappingNode = vec![("foo", "bar"), ("baz", "meta")].into_iter().collect();
+        assert_eq!(map, map4);
+    }
+
+    #[test]
+    fn extra_node_impls() {
+        let node = Node::from(vec!["foo"]);
+        assert_ne!(node.as_sequence(), None);
+        let node = Node::from(MappingHash::new());
+        assert!(node.as_mapping().unwrap().is_empty());
+    }
+
+    #[test]
+    fn yaml_conversions() {
+        use yaml_rust::YamlLoader;
+        let mut everything =
+            YamlLoader::load_from_str(include_str!("../examples/everything.yaml")).unwrap();
+        let everything = everything.pop().unwrap();
+        let node = Node::try_from(everything.clone()).unwrap();
+        assert!(node.as_mapping().is_some());
+        let badscalar = MarkedScalarNode::try_from(everything);
+        assert_eq!(badscalar, Err(YamlConversionError::NonScalar));
+        let badscalar = MarkedScalarNode::try_from(YamlNode::BadValue);
+        assert_eq!(badscalar, Err(YamlConversionError::BadValue));
+        let badscalar = MarkedScalarNode::try_from(YamlNode::Array(vec![]));
+        assert_eq!(badscalar, Err(YamlConversionError::NonScalar));
     }
 }
