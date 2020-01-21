@@ -11,6 +11,41 @@ use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 use yaml_rust::Yaml as YamlNode;
 
+/// A displayable marker for a YAML node
+///
+/// While `Marker` can be `Display`'d it doesn't understand what its source
+/// means.  This struct is the result of asking a Marker to render itself.
+///
+/// ```
+/// # use marked_yaml::*;
+/// let filenames = vec!["examples/everything.yaml"];
+/// let nodes: Vec<_> = filenames
+///     .iter()
+///     .enumerate()
+///     .map(|(i, name)| parse_yaml(i, std::fs::read_to_string(name).unwrap()).unwrap())
+///     .collect();
+/// for (n, node) in nodes.iter().enumerate() {
+///     let marker = node.span().start().unwrap();
+///     let rendered = format!("{}", marker.render(|i| filenames[i]));
+///     assert!(rendered.starts_with(filenames[n]));
+/// }
+/// ```
+pub struct RenderedMarker<D> {
+    source: D,
+    line: usize,
+    column: usize,
+}
+
+impl<D> Display for RenderedMarker<D>
+where
+    D: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.source.fmt(f)?;
+        write!(f, ":{}:{}", self.line, self.column)
+    }
+}
+
 /// A marker for a YAML node
 ///
 /// This indicates where a node started or ended.
@@ -90,6 +125,31 @@ impl Marker {
     /// ```
     pub fn column(&self) -> usize {
         self.column
+    }
+
+    /// Render this marker
+    ///
+    /// Markers have a source identifier, typically as passed to `parse_yaml()`
+    /// but have no way in and of themselves to turn that into a useful name.
+    /// This function allows you to create a rendered marker which knows how
+    /// to show the source name.
+    ///
+    /// ```
+    /// # use marked_yaml::Marker;
+    /// # let marker = Marker::new(0, 1, 2);
+    /// let rendered = marker.render(|_| "name");
+    /// assert_eq!(format!("{}", rendered), "name:1:2")
+    /// ```
+    pub fn render<D, F>(self, renderfn: F) -> RenderedMarker<D>
+    where
+        D: Display,
+        F: FnOnce(usize) -> D,
+    {
+        RenderedMarker {
+            source: renderfn(self.source),
+            line: self.line,
+            column: self.column,
+        }
     }
 }
 
