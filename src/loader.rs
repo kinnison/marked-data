@@ -11,7 +11,7 @@ use yaml_rust::scanner::ScanError;
 use std::fmt::{self, Display};
 
 /// Errors which can occur during loading of YAML
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LoadError {
     /// An unknown error occurred
     Unknown,
