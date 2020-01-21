@@ -13,14 +13,10 @@ use std::fmt::{self, Display};
 /// Errors which can occur during loading of YAML
 #[derive(Debug, PartialEq, Eq)]
 pub enum LoadError {
-    /// An unknown error occurred
-    Unknown,
     /// Something other than a mapping detected at the top level
     TopLevelMustBeMapping(Marker),
     /// Unexpected definition of anchor
     UnexpectedAnchor(Marker),
-    /// Unexpected use of an alias
-    UnexpectedAlias(Marker),
     /// Mapping keys must be scalars
     MappingKeyMustBeScalar(Marker),
     /// An explicit tag was detected
@@ -33,13 +29,11 @@ impl Display for LoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use LoadError::*;
         match self {
-            Unknown => write!(f, "Unknown error"),
-            ScanError(e) => write!(f, "Low level error: {}", e),
             TopLevelMustBeMapping(m) => write!(f, "{}: Top level must be a mapping", m),
             UnexpectedAnchor(m) => write!(f, "{}: Unexpected definition of anchor", m),
-            UnexpectedAlias(m) => write!(f, "{}: Unexpected use of alias", m),
             MappingKeyMustBeScalar(m) => write!(f, "{}: Keys in mappings must be scalar", m),
             UnexpectedTag(m) => write!(f, "{}: Unexpected use of YAML tag", m),
+            ScanError(e) => write!(f, "Low level error: {}", e),
         }
     }
 }
@@ -85,7 +79,7 @@ impl MarkedEventReceiver for MarkedLoader {
             .pop()
             .expect("State stack became unbalanced");
         let newstate = match ev {
-            Event::Alias(_) => Error(LoadError::UnexpectedAlias(mark)),
+            Event::Alias(_) => unreachable!(),
             Event::StreamStart => {
                 assert_eq!(curstate, Initial);
                 StartStream
@@ -127,7 +121,7 @@ impl MarkedEventReceiver for MarkedLoader {
                                 list.push(node);
                                 SequenceWaitingOnValue(mark, list)
                             }
-                            _ => Error(LoadError::Unknown),
+                            _ => unreachable!(),
                         }
                     } else {
                         Finished(node)
@@ -233,13 +227,11 @@ impl MarkedLoader {
     }
 
     fn finish(mut self) -> Result<Node, LoadError> {
-        match self.state_stack.len() {
-            0 => Err(LoadError::Unknown),
-            _ => match self.state_stack.pop().unwrap() {
-                Finished(n) => Ok(n),
-                Error(e) => Err(e),
-                _ => unreachable!(),
-            },
+        let top = self.state_stack.pop();
+        match top.expect("YAML parser state stack unexpectedly empty") {
+            Finished(n) => Ok(n),
+            Error(e) => Err(e),
+            _ => unreachable!(),
         }
     }
 }
@@ -319,7 +311,7 @@ mod test {
     #[test]
     fn toplevel_is_sequence() {
         assert_eq!(
-            parse_yaml(0, "foo"),
+            parse_yaml(0, "[]"),
             Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 1, 1)))
         );
     }
@@ -344,15 +336,6 @@ mod test {
         assert_eq!(
             parse_yaml(0, "{bar: &foo susan}"),
             Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 12)))
-        );
-    }
-
-    #[test]
-    #[ignore = "not sure yet if this error is possible"]
-    fn unexpected_alias() {
-        assert_eq!(
-            parse_yaml(0, "{<<: *foo}"),
-            Err(LoadError::UnexpectedAlias(Marker::new(0, 1, 1)))
         );
     }
 
