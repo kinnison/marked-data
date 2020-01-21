@@ -257,9 +257,12 @@ impl MarkedLoader {
 ///     .as_mapping()
 ///     .unwrap();
 /// ```
-pub fn parse_yaml(source: usize, yaml: &str) -> Result<Node, LoadError> {
+pub fn parse_yaml<S>(source: usize, yaml: S) -> Result<Node, LoadError>
+where
+    S: AsRef<str>,
+{
     let mut loader = MarkedLoader::new(source);
-    let mut parser = Parser::new(yaml.chars());
+    let mut parser = Parser::new(yaml.as_ref().chars());
     parser.load(&mut loader, false).map_err(|se| {
         let mark = loader.marker(*se.marker());
         LoadError::ScanError(mark, se)
