@@ -46,7 +46,7 @@ impl Display for LoadError {
 
 impl std::error::Error for LoadError {}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum LoaderState {
     Initial,
     StartStream,
@@ -76,7 +76,7 @@ struct MarkedLoader {
 impl MarkedEventReceiver for MarkedLoader {
     fn on_event(&mut self, ev: Event, mark: YamlMarker) {
         // Short-circuit if the state stack is in error
-        if self.state_stack.len() == 1 && self.state_stack[0].is_error() {
+        if self.state_stack[self.state_stack.len() - 1].is_error() {
             return;
         }
         let mark = self.marker(mark);
@@ -87,18 +87,12 @@ impl MarkedEventReceiver for MarkedLoader {
         let newstate = match ev {
             Event::Alias(_) => Error(LoadError::UnexpectedAlias(mark)),
             Event::StreamStart => {
-                if let Initial = curstate {
-                    StartStream
-                } else {
-                    Error(LoadError::Unknown)
-                }
+                assert_eq!(curstate, Initial);
+                StartStream
             }
             Event::DocumentStart => {
-                if let StartStream = curstate {
-                    StartDocument
-                } else {
-                    Error(LoadError::Unknown)
-                }
+                assert_eq!(curstate, StartStream);
+                StartDocument
             }
             Event::MappingStart(aid) => {
                 if aid == 0 {
@@ -113,7 +107,7 @@ impl MarkedEventReceiver for MarkedLoader {
                             self.state_stack.push(curstate);
                             MappingWaitingOnKey(mark, MappingHash::new())
                         }
-                        _ => Error(LoadError::Unknown),
+                        _ => unreachable!(),
                     }
                 } else {
                     Error(LoadError::UnexpectedAnchor(mark))
@@ -139,7 +133,7 @@ impl MarkedEventReceiver for MarkedLoader {
                         Finished(node)
                     }
                 }
-                _ => Error(LoadError::Unknown),
+                _ => unreachable!(),
             },
             Event::SequenceStart(aid) => {
                 if aid == 0 {
@@ -154,7 +148,7 @@ impl MarkedEventReceiver for MarkedLoader {
                             self.state_stack.push(sv);
                             SequenceWaitingOnValue(mark, Vec::new())
                         }
-                        _ => Error(LoadError::Unknown),
+                        _ => unreachable!(),
                     }
                 } else {
                     Error(LoadError::UnexpectedAnchor(mark))
@@ -174,21 +168,24 @@ impl MarkedEventReceiver for MarkedLoader {
                                 list.push(node);
                                 SequenceWaitingOnValue(mark, list)
                             }
-                            _ => Error(LoadError::Unknown),
+                            _ => unreachable!(),
                         }
                     } else {
-                        Error(LoadError::Unknown)
+                        unreachable!()
                     }
                 }
-                _ => Error(LoadError::Unknown),
+                _ => unreachable!(),
             },
             Event::DocumentEnd => match curstate {
                 Finished(_) => curstate,
-                _ => Error(LoadError::Unknown),
+                _ => unreachable!(),
             },
             Event::StreamEnd => match curstate {
+                StartStream => Finished(Node::from(MarkedMappingNode::new_empty(
+                    Span::new_with_marks(mark, mark),
+                ))),
                 Finished(_) => curstate,
-                _ => Error(LoadError::Unknown),
+                _ => unreachable!(),
             },
             Event::Scalar(val, _kind, aid, tag) => {
                 if aid == 0 {
@@ -210,14 +207,14 @@ impl MarkedEventReceiver for MarkedLoader {
                                 SequenceWaitingOnValue(mark, list)
                             }
                             StartDocument => Error(LoadError::TopLevelMustBeMapping(mark)),
-                            _ => Error(LoadError::Unknown),
+                            _ => unreachable!(),
                         }
                     }
                 } else {
                     Error(LoadError::UnexpectedAnchor(mark))
                 }
             }
-            Event::Nothing => Error(LoadError::Unknown),
+            Event::Nothing => unreachable!(),
         };
         self.state_stack.push(newstate);
     }
@@ -238,12 +235,11 @@ impl MarkedLoader {
     fn finish(mut self) -> Result<Node, LoadError> {
         match self.state_stack.len() {
             0 => Err(LoadError::Unknown),
-            1 => match self.state_stack.pop().unwrap() {
+            _ => match self.state_stack.pop().unwrap() {
                 Finished(n) => Ok(n),
                 Error(e) => Err(e),
-                _ => Err(LoadError::Unknown),
+                _ => unreachable!(),
             },
-            _ => Err(LoadError::Unknown),
         }
     }
 }
@@ -294,6 +290,20 @@ mod test {
         assert_eq!(map.get_scalar("simple").unwrap().as_str(), "scalar");
         assert_eq!(map.get_scalar("boolean1").unwrap().as_bool(), Some(true));
         assert_eq!(map.get_scalar("boolean2").unwrap().as_bool(), Some(false));
+    }
+
+    #[test]
+    fn toplevel_is_empty() {
+        let node = parse_yaml(0, "").unwrap();
+        let map = node.as_mapping().unwrap();
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn toplevel_is_empty_inline() {
+        let node = parse_yaml(0, "{}").unwrap();
+        let map = node.as_mapping().unwrap();
+        assert!(map.is_empty());
     }
 
     #[test]
