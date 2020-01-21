@@ -368,4 +368,12 @@ mod test {
             Err(LoadError::UnexpectedTag(Marker::new(0, 1, 13)))
         );
     }
+
+    #[test]
+    fn nested_mapping_key_mapping() {
+        assert_eq!(
+            parse_yaml(0, "{foo: {? [] : {}}}"),
+            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 10)))
+        );
+    }
 }
