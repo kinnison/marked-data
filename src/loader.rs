@@ -308,10 +308,12 @@ mod test {
 
     #[test]
     fn toplevel_is_scalar() {
+        let err = parse_yaml(0, "foo");
         assert_eq!(
-            parse_yaml(0, "foo"),
+            err,
             Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 1, 1)))
         );
+        assert!(format!("{}", err.err().unwrap()).contains("1:1: "));
     }
 
     #[test]
@@ -324,10 +326,9 @@ mod test {
 
     #[test]
     fn unexpected_anchor() {
-        assert_eq!(
-            parse_yaml(0, "&foo {}"),
-            Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 6)))
-        );
+        let err = parse_yaml(0, "&foo {}");
+        assert_eq!(err, Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 6))));
+        assert!(format!("{}", err.err().unwrap()).starts_with("1:6: "));
     }
 
     #[test]
@@ -357,10 +358,12 @@ mod test {
 
     #[test]
     fn mapping_key_mapping() {
+        let err = parse_yaml(0, "{? {} : {}}");
         assert_eq!(
-            parse_yaml(0, "{? {} : {}}"),
+            err,
             Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 4)))
         );
+        assert!(format!("{}", err.err().unwrap()).starts_with("1:4: "));
     }
 
     #[test]
@@ -373,10 +376,9 @@ mod test {
 
     #[test]
     fn unexpected_tag() {
-        assert_eq!(
-            parse_yaml(0, "{foo: !!str bar}"),
-            Err(LoadError::UnexpectedTag(Marker::new(0, 1, 13)))
-        );
+        let err = parse_yaml(0, "{foo: !!str bar}");
+        assert_eq!(err, Err(LoadError::UnexpectedTag(Marker::new(0, 1, 13))));
+        assert!(format!("{}", err.err().unwrap()).starts_with("1:13: "));
     }
 
     #[test]
