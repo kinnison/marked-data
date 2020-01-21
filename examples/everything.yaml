@@ -9,6 +9,11 @@ integer: 1234
 float: 12.34
 nullvalue: null
 
+mapping:
+  nesting: is
+  quite:
+    quite: possible
+
 plainsequence:
   - simple
   - values
@@ -19,3 +24,4 @@ heterogenous:
   - multiple
   - types: of
   - [values, are supported]
+  - { such: as, these: values }
