@@ -276,3 +276,96 @@ pub fn parse_yaml(source: usize, yaml: &str) -> Result<Node, LoadError> {
         .map_err(LoadError::ScanError)?;
     loader.finish()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn smoke_basics() {
+        let node = parse_yaml(0, "{}").unwrap();
+        assert!(node.as_mapping().is_some());
+    }
+
+    #[test]
+    fn load_everything() {
+        let node = parse_yaml(0, include_str!("../examples/everything.yaml")).unwrap();
+        let map = node.as_mapping().unwrap();
+        assert_eq!(map.get_scalar("simple").unwrap().as_str(), "scalar");
+        assert_eq!(map.get_scalar("boolean1").unwrap().as_bool(), Some(true));
+        assert_eq!(map.get_scalar("boolean2").unwrap().as_bool(), Some(false));
+    }
+
+    #[test]
+    fn toplevel_is_scalar() {
+        assert_eq!(
+            parse_yaml(0, "foo"),
+            Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 1, 1)))
+        );
+    }
+
+    #[test]
+    fn toplevel_is_sequence() {
+        assert_eq!(
+            parse_yaml(0, "foo"),
+            Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 1, 1)))
+        );
+    }
+
+    #[test]
+    fn unexpected_anchor() {
+        assert_eq!(
+            parse_yaml(0, "&foo {}"),
+            Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 6)))
+        );
+    }
+
+    #[test]
+    fn unexpected_anchor2() {
+        assert_eq!(
+            parse_yaml(0, "{bar: &foo []}"),
+            Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 12)))
+        );
+    }
+
+    #[test]
+    fn unexpected_anchor3() {
+        assert_eq!(
+            parse_yaml(0, "{bar: &foo susan}"),
+            Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 12)))
+        );
+    }
+
+    #[test]
+    #[ignore = "not sure yet if this error is possible"]
+    fn unexpected_alias() {
+        assert_eq!(
+            parse_yaml(0, "{<<: *foo}"),
+            Err(LoadError::UnexpectedAlias(Marker::new(0, 1, 1)))
+        );
+    }
+
+    #[test]
+    fn mapping_key_mapping() {
+        assert_eq!(
+            parse_yaml(0, "{? {} : {}}"),
+            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 4)))
+        );
+    }
+
+    #[test]
+    fn mapping_key_sequence() {
+        assert_eq!(
+            parse_yaml(0, "{? [] : {}}"),
+            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 4)))
+        );
+    }
+
+    #[test]
+    fn unexpected_tag() {
+        assert_eq!(
+            parse_yaml(0, "{foo: !!str bar}"),
+            Err(LoadError::UnexpectedTag(Marker::new(0, 1, 13)))
+        );
+    }
+}
