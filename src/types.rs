@@ -151,6 +151,45 @@ impl Marker {
             column: self.column,
         }
     }
+
+    /// Set the source index for this marker
+    ///
+    /// ```
+    /// # use marked_yaml::Marker;
+    /// # let mut marker = Marker::new(0, 0, 0);
+    /// assert_ne!(marker.source(), 1);
+    /// marker.set_source(1);
+    /// assert_eq!(marker.source(), 1);
+    /// ```
+    pub fn set_source(&mut self, source: usize) {
+        self.source = source;
+    }
+
+    /// Set the line number for this marker
+    ///
+    /// ```
+    /// # use marked_yaml::Marker;
+    /// # let mut marker = Marker::new(0, 0, 0);
+    /// assert_ne!(marker.line(), 1);
+    /// marker.set_line(1);
+    /// assert_eq!(marker.line(), 1);
+    /// ```
+    pub fn set_line(&mut self, line: usize) {
+        self.line = line;
+    }
+
+    /// Set the column number for this marker
+    ///
+    /// ```
+    /// # use marked_yaml::Marker;
+    /// # let mut marker = Marker::new(0, 0, 0);
+    /// assert_ne!(marker.column(), 1);
+    /// marker.set_column(1);
+    /// assert_eq!(marker.column(), 1);
+    /// ```
+    pub fn set_column(&mut self, column: usize) {
+        self.column = column;
+    }
 }
 
 impl Display for Marker {
@@ -244,6 +283,56 @@ impl Span {
     /// ```
     pub fn end(&self) -> Option<&Marker> {
         self.end.as_ref()
+    }
+
+    /// The start of the span, mutably
+    ///
+    /// ```
+    /// # use marked_yaml::{Marker, Span};
+    /// # let mut span = Span::new_with_marks(Marker::new(0, 1, 1), Marker::new(10, 2, 1));
+    /// span.start_mut().unwrap().set_line(5);
+    /// assert_eq!(span.start(), Some(&Marker::new(0, 5, 1)));
+    /// ```
+    pub fn start_mut(&mut self) -> Option<&mut Marker> {
+        self.start.as_mut()
+    }
+
+    /// The end of the span, mutably
+    ///
+    /// ```
+    /// # use marked_yaml::{Marker, Span};
+    /// # let mut span = Span::new_with_marks(Marker::new(0, 1, 1), Marker::new(10, 2, 1));
+    /// span.end_mut().unwrap().set_line(5);
+    /// assert_eq!(span.end(), Some(&Marker::new(10, 5, 1)));
+    /// ```
+    pub fn end_mut(&mut self) -> Option<&mut Marker> {
+        self.end.as_mut()
+    }
+
+    /// Replace the start of the span
+    ///
+    /// ```
+    /// # use marked_yaml::{Marker, Span};
+    /// # let mut span = Span::new_blank();
+    /// assert_eq!(span.start(), None);
+    /// span.set_start(Some(Marker::new(0, 1, 2)));
+    /// assert_eq!(span.start(), Some(&Marker::new(0, 1, 2)));
+    /// ```
+    pub fn set_start(&mut self, start: Option<Marker>) {
+        self.start = start;
+    }
+
+    /// Replace the end of the span
+    ///
+    /// ```
+    /// # use marked_yaml::{Marker, Span};
+    /// # let mut span = Span::new_blank();
+    /// assert_eq!(span.end(), None);
+    /// span.set_end(Some(Marker::new(0, 1, 2)));
+    /// assert_eq!(span.end(), Some(&Marker::new(0, 1, 2)));
+    /// ```
+    pub fn set_end(&mut self, end: Option<Marker>) {
+        self.end = end;
     }
 }
 
@@ -401,6 +490,18 @@ assert_eq!(node.span(), &Span::new_blank());
             pub fn span(&self) -> &Span {
                 &self.span
             });
+            doc_comment!(
+                concat!(r#"Retrieve the Span from this node mutably.
+
+```
+# use marked_yaml::types::*;
+let mut node = "#, stringify!($t), r#"::new_empty(Span::new_blank());
+node.span_mut().set_start(Some(Marker::new(0, 1, 0)));
+assert_eq!(node.span().start(), Some(&Marker::new(0, 1, 0)));
+```"#),
+            pub fn span_mut(&mut self) -> &mut Span {
+                &mut self.span
+            });
         }
     };
 }
@@ -423,6 +524,24 @@ impl Node {
             Node::Scalar(msn) => msn.span(),
             Node::Sequence(msn) => msn.span(),
             Node::Mapping(mmn) => mmn.span(),
+        }
+    }
+
+    /// Retrieve the Span from the contained Node, mutably
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let mut node: Node = "foobar".into();
+    /// let mut span = node.span_mut();
+    /// assert_eq!(span.start(), None);
+    /// span.set_start(Some(Marker::new(0, 1, 0)));
+    /// assert_eq!(span.start(), Some(&Marker::new(0, 1, 0)));
+    /// ```
+    pub fn span_mut(&mut self) -> &mut Span {
+        match self {
+            Node::Scalar(msn) => msn.span_mut(),
+            Node::Sequence(msn) => msn.span_mut(),
+            Node::Mapping(mmn) => mmn.span_mut(),
         }
     }
 
