@@ -28,12 +28,17 @@ pub enum LoadError {
 impl Display for LoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use LoadError::*;
+        #[allow(deprecated)]
         match self {
             TopLevelMustBeMapping(m) => write!(f, "{}: Top level must be a mapping", m),
             UnexpectedAnchor(m) => write!(f, "{}: Unexpected definition of anchor", m),
             MappingKeyMustBeScalar(m) => write!(f, "{}: Keys in mappings must be scalar", m),
             UnexpectedTag(m) => write!(f, "{}: Unexpected use of YAML tag", m),
-            ScanError(m, e) => write!(f, "{}: {}", m, e.description()),
+            ScanError(m, e) => {
+                // e.description() is deprecated but it's the only way to get
+                // the exact info we want out of yaml-rust
+                write!(f, "{}: {}", m, e.description())
+            }
         }
     }
 }
