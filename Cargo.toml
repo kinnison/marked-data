@@ -1,10 +1,18 @@
 [package]
 name = "marked-yaml"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Daniel Silverstone <dsilvers@digital-scurf.org>"]
 edition = "2018"
+description = "A simplified YAML structure with provenance spans"
+homepage = "https://github.com/kinnison/marked-yaml/"
+repository = "https://github.com/kinnison/marked-yaml.git"
+readme = "README.md"
+keywords = ["yaml", "provenance"]
+categories = ["data-structures", "encoding", "parsing"]
+license = "MIT"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[badges]
+maintenance = { status = "experimental" }
 
 [dependencies]
 doc-comment = "0.3"
