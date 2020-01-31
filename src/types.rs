@@ -49,7 +49,15 @@ where
 /// A marker for a YAML node
 ///
 /// This indicates where a node started or ended.
-/// TODO: example
+///
+/// ```
+/// use marked_yaml::{parse_yaml, Marker};
+/// let node = parse_yaml(100, "{foo: bar}").unwrap();
+/// let map = node.as_mapping().unwrap();
+/// let bar = map.get("foo").unwrap();
+/// // the "bar" string started on line 1, column 7 of source ID 100.
+/// assert_eq!(bar.span().start(), Some(&Marker::new(100, 1, 7)));
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Marker {
     source: usize,
@@ -200,7 +208,12 @@ impl Display for Marker {
 
 /// The span for a YAML marked node
 ///
-/// TODO: example
+/// ```
+/// use marked_yaml::{parse_yaml, Marker, Span};
+/// let node = parse_yaml(100, "{foo: bar}").unwrap();
+/// let map = node.as_mapping().unwrap();
+/// assert_eq!(map.span(), &Span::new_with_marks(Marker::new(100, 1, 1), Marker::new(100, 1, 10)));
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     start: Option<Marker>,
@@ -341,8 +354,11 @@ impl Span {
 /// **NOTE**: Nodes are considered equal even if they don't come from the
 /// same place.  *i.e. their spans are ignored for equality and hashing*
 ///
-/// TODO: explain simplified YAML
-/// TODO: example
+/// ```
+/// use marked_yaml::parse_yaml;
+/// let node = parse_yaml(100, "{foo: bar}").unwrap();
+/// assert!(node.as_mapping().is_some());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Node {
     /// A YAML scalar
@@ -372,7 +388,14 @@ pub enum Node {
 /// **NOTE**: Nodes are considered equal even if they don't come from the
 /// same place.  *i.e. their spans are ignored for equality and hashing*
 ///
-/// TODO: example
+/// ```
+/// use marked_yaml::{parse_yaml, Marker};
+/// let node = parse_yaml(100, "{foo: bar}").unwrap();
+/// let map = node.as_mapping().unwrap();
+/// let bar = map.get("foo").unwrap();
+/// // the "bar" string started on line 1, column 7 of source ID 100.
+/// assert_eq!(bar.span().start(), Some(&Marker::new(100, 1, 7)));
+/// ```
 #[derive(Clone, Debug)]
 pub struct MarkedScalarNode {
     span: Span,
@@ -392,7 +415,12 @@ pub(crate) type MappingHash = LinkedHashMap<MarkedScalarNode, Node>;
 /// **NOTE**: Nodes are considered equal even if they don't come from the
 /// same place.  *i.e. their spans are ignored for equality and hashing*
 ///
-/// TODO: example
+/// ```
+/// use marked_yaml::{parse_yaml, Marker, Span};
+/// let node = parse_yaml(100, "{foo: bar}").unwrap();
+/// let map = node.as_mapping().unwrap();
+/// assert_eq!(map.span(), &Span::new_with_marks(Marker::new(100, 1, 1), Marker::new(100, 1, 10)));
+/// ```
 #[derive(Clone, Debug)]
 pub struct MarkedMappingNode {
     span: Span,
@@ -406,7 +434,14 @@ pub struct MarkedMappingNode {
 /// **NOTE**: Nodes are considered equal even if they don't come from the
 /// same place.  *i.e. their spans are ignored for equality and hashing*
 ///
-/// TODO: example
+/// ```
+/// use marked_yaml::{parse_yaml, Marker, Span};
+/// let node = parse_yaml(100, "{foo: [bar]}").unwrap();
+/// let map = node.as_mapping().unwrap();
+/// let seq = map.get("foo").unwrap();
+/// let seq = seq.as_sequence().unwrap();
+/// assert_eq!(seq.span(), &Span::new_with_marks(Marker::new(100, 1, 7), Marker::new(100, 1, 11)));
+/// ```
 #[derive(Clone, Debug)]
 pub struct MarkedSequenceNode {
     span: Span,

@@ -1,6 +1,5 @@
-//! Loading YAML from strings
+//! Loading YAML
 //!
-//! TODO: better frontmatter
 
 use crate::types::*;
 
