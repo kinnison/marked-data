@@ -1218,6 +1218,40 @@ impl TryFrom<YamlNode> for Node {
     }
 }
 
+impl From<MarkedScalarNode> for YamlNode {
+    fn from(value: MarkedScalarNode) -> Self {
+        YamlNode::String(value.value)
+    }
+}
+
+impl From<MarkedSequenceNode> for YamlNode {
+    fn from(value: MarkedSequenceNode) -> Self {
+        YamlNode::Array(value.value.into_iter().map(Into::into).collect())
+    }
+}
+
+impl From<MarkedMappingNode> for YamlNode {
+    fn from(value: MarkedMappingNode) -> Self {
+        YamlNode::Hash(
+            value
+                .value
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
+    }
+}
+
+impl From<Node> for YamlNode {
+    fn from(value: Node) -> Self {
+        match value {
+            Node::Scalar(msn) => msn.into(),
+            Node::Sequence(msn) => msn.into(),
+            Node::Mapping(mmn) => mmn.into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::super::*;
@@ -1353,5 +1387,35 @@ mod test {
         assert_eq!(badscalar, Err(YamlConversionError::BadValue));
         let badscalar = MarkedScalarNode::try_from(YamlNode::Array(vec![]));
         assert_eq!(badscalar, Err(YamlConversionError::NonScalar));
+    }
+
+    fn flatten(node: YamlNode) -> YamlNode {
+        match node {
+            YamlNode::Array(arr) => YamlNode::Array(arr.into_iter().map(flatten).collect()),
+            YamlNode::Boolean(b) => {
+                YamlNode::String((if b { "true" } else { "false" }).to_string())
+            }
+            YamlNode::Hash(h) => YamlNode::Hash(
+                h.into_iter()
+                    .map(|(k, v)| (flatten(k), flatten(v)))
+                    .collect(),
+            ),
+            YamlNode::Integer(i) => YamlNode::String(format!("{}", i)),
+            YamlNode::Null => YamlNode::String("null".to_string()),
+            YamlNode::Real(r) => YamlNode::String(r),
+            other => other,
+        }
+    }
+
+    #[test]
+    fn back_yaml_conversion() {
+        use yaml_rust::YamlLoader;
+        let mut everything =
+            YamlLoader::load_from_str(include_str!("../examples/everything.yaml")).unwrap();
+        let everything = everything.pop().unwrap();
+        let node = Node::try_from(everything.clone()).unwrap();
+        let other: YamlNode = node.into();
+        let flat = flatten(everything);
+        assert_eq!(flat, other);
     }
 }
