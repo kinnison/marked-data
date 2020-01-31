@@ -589,6 +589,51 @@ impl Node {
             _ => None,
         }
     }
+
+    /// Retrieve the scalar from this node if there is one, mutably
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let mut node: Node = "foobar".into();
+    /// let mut scalar = node.as_scalar_mut();
+    /// assert!(scalar.is_some());
+    /// ```
+    pub fn as_scalar_mut(&mut self) -> Option<&mut MarkedScalarNode> {
+        match self {
+            Node::Scalar(msn) => Some(msn),
+            _ => None,
+        }
+    }
+
+    /// Retrieve the sequence from this node if there is one, mutably
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let mut node: Node = vec!["foobar"].into();
+    /// let mut sequence = node.as_sequence_mut();
+    /// assert!(sequence.is_some());
+    /// ```
+    pub fn as_sequence_mut(&mut self) -> Option<&mut MarkedSequenceNode> {
+        match self {
+            Node::Sequence(msn) => Some(msn),
+            _ => None,
+        }
+    }
+
+    /// Retrieve the mapping from this node if there is one, mutably
+    ///
+    /// ```
+    /// # use marked_yaml::*;
+    /// let mut node: Node = parse_yaml(0, "{foobar: baz}").unwrap();
+    /// let mut mapping = node.as_mapping_mut();
+    /// assert!(mapping.is_some());
+    /// ```
+    pub fn as_mapping_mut(&mut self) -> Option<&mut MarkedMappingNode> {
+        match self {
+            Node::Mapping(mmn) => Some(mmn),
+            _ => None,
+        }
+    }
 }
 
 impl MarkedScalarNode {
