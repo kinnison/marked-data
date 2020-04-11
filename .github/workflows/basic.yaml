@@ -68,14 +68,17 @@ jobs:
         name: Build the library in debug mode
         with:
           command: build
+          args: --all
       - uses: actions-rs/cargo@v1
         name: Run the tests
         with:
           command: test
+          args: --all
       - uses: actions-rs/cargo@v1
         name: Run clippy
         with:
           command: clippy
+          args: --all
         if: matrix.clippyetc
       - uses: actions-rs/cargo@v1
         name: Check formatting

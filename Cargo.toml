@@ -1,22 +1,4 @@
-[package]
-name = "marked-yaml"
-version = "0.1.0"
-authors = ["Daniel Silverstone <dsilvers@digital-scurf.org>"]
-edition = "2018"
-description = "A simplified YAML structure with provenance spans"
-homepage = "https://github.com/kinnison/marked-yaml/"
-repository = "https://github.com/kinnison/marked-yaml.git"
-readme = "README.md"
-keywords = ["yaml", "provenance"]
-categories = ["data-structures", "encoding", "parsing"]
-license = "MIT"
-
-[badges]
-maintenance = { status = "experimental" }
-
-[dependencies]
-doc-comment = "0.3"
-# We lock the yaml-rust version down hard for now
-yaml-rust = "=0.4.3"
-# We should keep this in sync with the use from yaml-rust
-linked-hash-map = "0.5"
+[workspace]
+members = [
+    "marked-yaml",
+]
