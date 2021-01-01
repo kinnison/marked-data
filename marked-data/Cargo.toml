@@ -1,0 +1,13 @@
+[package]
+name = "marked-data"
+version = "0.1.0"
+authors = ["Daniel Silverstone <dsilvers@digital-scurf.org>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
+fehler = "1.0"
+either = "1.5"
+lazy_static = "1"
