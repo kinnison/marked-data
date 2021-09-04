@@ -16,7 +16,7 @@ checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "marked-yaml"
-version = "0.2.0"
+version = "0.2.1-alpha.0"
 dependencies = [
  "doc-comment",
  "linked-hash-map",
