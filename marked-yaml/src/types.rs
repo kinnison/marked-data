@@ -515,28 +515,38 @@ macro_rules! node_span {
     ($t:path) => {
         impl $t {
             doc_comment!(
-                concat!(r#"Retrieve the Span from this node.
+                concat!(
+                    r#"Retrieve the Span from this node.
 
 ```
 # use marked_yaml::types::*;
-let node = "#, stringify!($t), r#"::new_empty(Span::new_blank());
+let node = "#,
+                    stringify!($t),
+                    r#"::new_empty(Span::new_blank());
 assert_eq!(node.span(), &Span::new_blank());
-```"#),
-            pub fn span(&self) -> &Span {
-                &self.span
-            });
+```"#
+                ),
+                pub fn span(&self) -> &Span {
+                    &self.span
+                }
+            );
             doc_comment!(
-                concat!(r#"Retrieve the Span from this node mutably.
+                concat!(
+                    r#"Retrieve the Span from this node mutably.
 
 ```
 # use marked_yaml::types::*;
-let mut node = "#, stringify!($t), r#"::new_empty(Span::new_blank());
+let mut node = "#,
+                    stringify!($t),
+                    r#"::new_empty(Span::new_blank());
 node.span_mut().set_start(Some(Marker::new(0, 1, 0)));
 assert_eq!(node.span().start(), Some(&Marker::new(0, 1, 0)));
-```"#),
-            pub fn span_mut(&mut self) -> &mut Span {
-                &mut self.span
-            });
+```"#
+                ),
+                pub fn span_mut(&mut self) -> &mut Span {
+                    &mut self.span
+                }
+            );
         }
     };
 }
@@ -830,7 +840,8 @@ assert_eq!(node.as_"#,
                     r#"(), Some(0"#,
                     stringify!($t),
                     r#"));
-```"#),
+```"#
+                ),
                 pub fn $as(&self) -> Option<$t> {
                     use std::str::FromStr;
                     $t::from_str(&self.value).ok()
