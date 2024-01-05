@@ -60,10 +60,7 @@ use LoaderState::*;
 
 impl LoaderState {
     fn is_error(&self) -> bool {
-        match self {
-            Error(_) => true,
-            _ => false,
-        }
+        matches!(self, Error(_))
     }
 }
 
