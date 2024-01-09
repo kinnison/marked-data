@@ -16,7 +16,5 @@ maintenance = { status = "experimental" }
 
 [dependencies]
 doc-comment = "0.3"
-# We lock the yaml-rust version down hard for now
-yaml-rust = "=0.4.5"
-# We should keep this in sync with the use from yaml-rust
-linked-hash-map = "=0.5.3"
+yaml-rust = "0.4.5"
+linked-hash-map = "0.5.6"
