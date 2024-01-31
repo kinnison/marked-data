@@ -23,6 +23,8 @@ pub enum LoadError {
     UnexpectedTag(Marker),
     /// A YAML scanner error occured
     ScanError(Marker, ScanError),
+    /// A duplicate key was detected in a mapping
+    DuplicateKey(MarkedScalarNode),
 }
 
 impl Display for LoadError {
@@ -34,6 +36,7 @@ impl Display for LoadError {
             UnexpectedAnchor(m) => write!(f, "{}: Unexpected definition of anchor", m),
             MappingKeyMustBeScalar(m) => write!(f, "{}: Keys in mappings must be scalar", m),
             UnexpectedTag(m) => write!(f, "{}: Unexpected use of YAML tag", m),
+            DuplicateKey(key) => write!(f, "{:?}: Duplicate key in mapping", key),
             ScanError(m, e) => {
                 // e.description() is deprecated but it's the only way to get
                 // the exact info we want out of yaml-rust
@@ -116,8 +119,12 @@ impl MarkedEventReceiver for MarkedLoader {
                     if let Some(topstate) = self.state_stack.pop() {
                         match topstate {
                             MappingWaitingOnValue(mark, mut map, key) => {
-                                map.insert(key, node);
-                                MappingWaitingOnKey(mark, map)
+                                if map.contains_key(&key) {
+                                    Error(LoadError::DuplicateKey(key))
+                                } else {
+                                    map.insert(key, node);
+                                    MappingWaitingOnKey(mark, map)
+                                }
                             }
                             SequenceWaitingOnValue(mark, mut list) => {
                                 list.push(node);
@@ -157,8 +164,12 @@ impl MarkedEventReceiver for MarkedLoader {
                     if let Some(topstate) = self.state_stack.pop() {
                         match topstate {
                             MappingWaitingOnValue(mark, mut map, key) => {
-                                map.insert(key, node);
-                                MappingWaitingOnKey(mark, map)
+                                if map.contains_key(&key) {
+                                    Error(LoadError::DuplicateKey(key))
+                                } else {
+                                    map.insert(key, node);
+                                    MappingWaitingOnKey(mark, map)
+                                }
                             }
                             SequenceWaitingOnValue(mark, mut list) => {
                                 list.push(node);
@@ -195,8 +206,12 @@ impl MarkedEventReceiver for MarkedLoader {
                                 MappingWaitingOnValue(mark, map, node)
                             }
                             MappingWaitingOnValue(mark, mut map, key) => {
-                                map.insert(key, Node::from(node));
-                                MappingWaitingOnKey(mark, map)
+                                if map.contains_key(&key) {
+                                    Error(LoadError::DuplicateKey(key))
+                                } else {
+                                    map.insert(key, Node::from(node));
+                                    MappingWaitingOnKey(mark, map)
+                                }
                             }
                             SequenceWaitingOnValue(mark, mut list) => {
                                 list.push(Node::from(node));
@@ -319,6 +334,17 @@ mod test {
         assert_eq!(
             parse_yaml(0, "[]"),
             Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 1, 1)))
+        );
+    }
+
+    #[test]
+    fn duplicate_key() {
+        assert_eq!(
+            parse_yaml(0, "{foo: bar, foo: baz}"),
+            Err(LoadError::DuplicateKey(MarkedScalarNode::new(
+                Span::new_start(Marker::new(0, 1, 11)),
+                "foo"
+            )))
         );
     }
 
