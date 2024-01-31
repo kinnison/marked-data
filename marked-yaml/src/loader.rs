@@ -27,6 +27,13 @@ pub enum LoadError {
     DuplicateKey(MarkedScalarNode),
 }
 
+/// Options for loading YAML
+pub struct LoaderOptions {
+    /// If true, duplicate keys in mappings will cause an error. If false,
+    /// the last key will be used.
+    pub error_on_duplicate_keys: bool,
+}
+
 impl Display for LoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use LoadError::*;
@@ -70,6 +77,7 @@ impl LoaderState {
 struct MarkedLoader {
     source: usize,
     state_stack: Vec<LoaderState>,
+    options: LoaderOptions,
 }
 
 impl MarkedEventReceiver for MarkedLoader {
@@ -119,7 +127,7 @@ impl MarkedEventReceiver for MarkedLoader {
                     if let Some(topstate) = self.state_stack.pop() {
                         match topstate {
                             MappingWaitingOnValue(mark, mut map, key) => {
-                                if map.contains_key(&key) {
+                                if self.options.error_on_duplicate_keys && map.contains_key(&key) {
                                     Error(LoadError::DuplicateKey(key))
                                 } else {
                                     map.insert(key, node);
@@ -164,7 +172,7 @@ impl MarkedEventReceiver for MarkedLoader {
                     if let Some(topstate) = self.state_stack.pop() {
                         match topstate {
                             MappingWaitingOnValue(mark, mut map, key) => {
-                                if map.contains_key(&key) {
+                                if self.options.error_on_duplicate_keys && map.contains_key(&key) {
                                     Error(LoadError::DuplicateKey(key))
                                 } else {
                                     map.insert(key, node);
@@ -206,7 +214,7 @@ impl MarkedEventReceiver for MarkedLoader {
                                 MappingWaitingOnValue(mark, map, node)
                             }
                             MappingWaitingOnValue(mark, mut map, key) => {
-                                if map.contains_key(&key) {
+                                if self.options.error_on_duplicate_keys && map.contains_key(&key) {
                                     Error(LoadError::DuplicateKey(key))
                                 } else {
                                     map.insert(key, Node::from(node));
@@ -232,10 +240,11 @@ impl MarkedEventReceiver for MarkedLoader {
 }
 
 impl MarkedLoader {
-    fn new(source: usize) -> Self {
+    fn new(source: usize, options: LoaderOptions) -> Self {
         Self {
             source,
             state_stack: vec![Initial],
+            options,
         }
     }
 
@@ -277,7 +286,26 @@ pub fn parse_yaml<S>(source: usize, yaml: S) -> Result<Node, LoadError>
 where
     S: AsRef<str>,
 {
-    let mut loader = MarkedLoader::new(source);
+    let options = LoaderOptions {
+        error_on_duplicate_keys: false,
+    };
+    parse_yaml_with_options(source, yaml, options)
+}
+
+/// Parse YAML from a string and return a Node representing
+/// the content.
+/// Takes an additional LoaderOptions struct to control the behavior of the loader.
+///
+/// See `parse_yaml` for more information.
+pub fn parse_yaml_with_options<S>(
+    source: usize,
+    yaml: S,
+    options: LoaderOptions,
+) -> Result<Node, LoadError>
+where
+    S: AsRef<str>,
+{
+    let mut loader = MarkedLoader::new(source, options);
     let mut parser = Parser::new(yaml.as_ref().chars());
     parser.load(&mut loader, false).map_err(|se| {
         let mark = loader.marker(*se.marker());
@@ -340,12 +368,22 @@ mod test {
     #[test]
     fn duplicate_key() {
         assert_eq!(
-            parse_yaml(0, "{foo: bar, foo: baz}"),
+            parse_yaml_with_options(
+                0,
+                "{foo: bar, foo: baz}",
+                LoaderOptions {
+                    error_on_duplicate_keys: true
+                }
+            ),
             Err(LoadError::DuplicateKey(MarkedScalarNode::new(
                 Span::new_start(Marker::new(0, 1, 11)),
                 "foo"
             )))
         );
+        // Without error_on_duplicate_keys, the last key wins
+        let node = parse_yaml(0, "{foo: bar, foo: baz}").unwrap();
+        let map = node.as_mapping().unwrap();
+        assert_eq!(map.get_scalar("foo").unwrap().as_str(), "baz");
     }
 
     #[test]
