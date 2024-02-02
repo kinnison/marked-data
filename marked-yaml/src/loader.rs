@@ -11,6 +11,16 @@ use yaml_rust::scanner::ScanError;
 use std::error::Error;
 use std::fmt::{self, Display};
 
+/// An error indicating that a duplicate key was detected in a mapping
+#[derive(Debug, PartialEq, Eq)]
+
+pub struct DuplicateKeyInner {
+    /// The first key
+    pub prev_key: MarkedScalarNode,
+    /// The second key
+    pub key: MarkedScalarNode,
+}
+
 /// Errors which can occur during loading of YAML
 #[derive(Debug, PartialEq, Eq)]
 pub enum LoadError {
@@ -25,7 +35,7 @@ pub enum LoadError {
     /// A YAML scanner error occured
     ScanError(Marker, ScanError),
     /// A duplicate key was detected in a mapping
-    DuplicateKey(MarkedScalarNode, MarkedScalarNode),
+    DuplicateKey(Box<DuplicateKeyInner>),
 }
 
 /// Options for loading YAML
@@ -44,21 +54,23 @@ impl Display for LoadError {
             UnexpectedAnchor(m) => write!(f, "{}: Unexpected definition of anchor", m),
             MappingKeyMustBeScalar(m) => write!(f, "{}: Keys in mappings must be scalar", m),
             UnexpectedTag(m) => write!(f, "{}: Unexpected use of YAML tag", m),
-            DuplicateKey(old_key, new_key) => write!(
-                f,
-                "Duplicate key \"{}\" in mapping at {} and {}",
-                old_key.as_str(),
-                old_key
-                    .span()
-                    .start()
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| "?".to_string()),
-                new_key
-                    .span()
-                    .start()
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| "?".to_string()),
-            ),
+            DuplicateKey(inner) => {
+                let DuplicateKeyInner { prev_key, key } = inner.as_ref();
+                write!(
+                    f,
+                    "Duplicate key \"{}\" in mapping at {} and {}",
+                    prev_key.as_str(),
+                    prev_key
+                        .span()
+                        .start()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| "?".to_string()),
+                    key.span()
+                        .start()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| "?".to_string()),
+                )
+            }
             ScanError(m, e) => {
                 // e.description() is deprecated but it's the only way to get
                 // the exact info we want out of yaml-rust
@@ -146,7 +158,12 @@ impl MarkedEventReceiver for MarkedLoader {
                                     Entry::Occupied(entry)
                                         if self.options.error_on_duplicate_keys =>
                                     {
-                                        Error(LoadError::DuplicateKey(entry.key().clone(), key))
+                                        Error(LoadError::DuplicateKey(Box::new(
+                                            DuplicateKeyInner {
+                                                prev_key: entry.key().clone(),
+                                                key,
+                                            },
+                                        )))
                                     }
                                     _ => {
                                         map.insert(key, node);
@@ -196,7 +213,12 @@ impl MarkedEventReceiver for MarkedLoader {
                                     Entry::Occupied(entry)
                                         if self.options.error_on_duplicate_keys =>
                                     {
-                                        Error(LoadError::DuplicateKey(entry.key().clone(), key))
+                                        Error(LoadError::DuplicateKey(Box::new(
+                                            DuplicateKeyInner {
+                                                prev_key: entry.key().clone(),
+                                                key,
+                                            },
+                                        )))
                                     }
                                     _ => {
                                         map.insert(key, node);
@@ -243,7 +265,12 @@ impl MarkedEventReceiver for MarkedLoader {
                                     Entry::Occupied(entry)
                                         if self.options.error_on_duplicate_keys =>
                                     {
-                                        Error(LoadError::DuplicateKey(entry.key().clone(), key))
+                                        Error(LoadError::DuplicateKey(Box::new(
+                                            DuplicateKeyInner {
+                                                prev_key: entry.key().clone(),
+                                                key,
+                                            },
+                                        )))
                                     }
                                     _ => {
                                         map.insert(key, Node::from(node));
@@ -407,10 +434,10 @@ mod test {
 
         assert_eq!(
             err,
-            Err(LoadError::DuplicateKey(
-                MarkedScalarNode::new(Span::new_start(Marker::new(0, 1, 1)), "foo"),
-                MarkedScalarNode::new(Span::new_start(Marker::new(0, 1, 11)), "foo")
-            ))
+            Err(LoadError::DuplicateKey(Box::new(DuplicateKeyInner {
+                prev_key: MarkedScalarNode::new(Span::new_start(Marker::new(0, 1, 1)), "foo"),
+                key: MarkedScalarNode::new(Span::new_start(Marker::new(0, 1, 11)), "foo")
+            })))
         );
 
         assert_eq!(
