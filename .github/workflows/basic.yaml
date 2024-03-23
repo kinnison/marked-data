@@ -48,7 +48,7 @@ jobs:
         shell: bash
         id: rustc
         run: |
-          echo "::set-output name=commit_hash::$(rustc -vV | grep commit-hash | cut -b14-23)"
+          echo "commit_hash=$(rustc -vV | grep commit-hash | cut -b14-23)" >> $GITHUB_OUTPUT
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
