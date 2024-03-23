@@ -22,4 +22,4 @@ serde = ["dep:serde"]
 doc-comment = "0.3"
 yaml-rust = "0.4.5"
 linked-hash-map = "0.5.6"
-serde = { version = "*", optional = true, features = ["derive"] }
+serde = { version = "1.0.69", optional = true, features = ["derive"] }
