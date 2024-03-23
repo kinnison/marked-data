@@ -36,11 +36,15 @@
 pub mod loader;
 pub mod types;
 
-pub use loader::{parse_yaml, LoadError};
+#[doc(inline)]
+pub use loader::{parse_yaml, parse_yaml_with_options, LoadError, LoaderOptions};
+#[doc(inline)]
 pub use types::{Marker, Node, Span};
 
 #[cfg(feature = "serde")]
+#[doc(hidden)]
 pub mod spanned_serde;
 
 #[cfg(feature = "serde")]
+#[doc(inline)]
 pub use spanned_serde::{from_node, Spanned};
