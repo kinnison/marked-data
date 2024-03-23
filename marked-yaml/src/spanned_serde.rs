@@ -1,6 +1,13 @@
 //! Serde support for marked data deserialisation
 
-use std::{fmt, hash::Hash, iter::Peekable, marker::PhantomData, ops::Deref};
+use std::{
+    fmt,
+    hash::Hash,
+    iter::Peekable,
+    marker::PhantomData,
+    num::{ParseFloatError, ParseIntError},
+    ops::Deref,
+};
 
 use serde::{
     de::{value::BorrowedStrDeserializer, IntoDeserializer, MapAccess, SeqAccess, Visitor},
@@ -192,6 +199,10 @@ where
 pub enum Error {
     /// The value was not a valid boolean
     NotBoolean(Span),
+    /// Failed to parse integer
+    IntegerParseFailure(ParseIntError),
+    /// Failed to parse float
+    FloatParseFailure(ParseFloatError),
     /// Some other error occurred
     Other(Box<dyn std::error::Error>),
 }
@@ -200,6 +211,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::NotBoolean(_s) => f.write_str("Value was not a boolean"),
+            Error::IntegerParseFailure(e) => e.fmt(f),
+            Error::FloatParseFailure(e) => e.fmt(f),
             Error::Other(e) => e.fmt(f),
         }
     }
@@ -213,6 +226,18 @@ impl serde::de::Error for Error {
         T: fmt::Display,
     {
         Error::Other(msg.to_string().into())
+    }
+}
+
+impl From<ParseIntError> for Error {
+    fn from(value: ParseIntError) -> Self {
+        Error::IntegerParseFailure(value)
+    }
+}
+
+impl From<ParseFloatError> for Error {
+    fn from(value: ParseFloatError) -> Self {
+        Error::FloatParseFailure(value)
     }
 }
 
@@ -266,47 +291,69 @@ where
     T::deserialize(NodeDeserializer::new(node))
 }
 
+macro_rules! forward_to_nodes {
+    () => {
+        forward_to_nodes! [
+            deserialize_any()
+            deserialize_bool()
+            deserialize_i8()
+            deserialize_i16()
+            deserialize_i32()
+            deserialize_i64()
+            deserialize_i128()
+            deserialize_u8()
+            deserialize_u16()
+            deserialize_u32()
+            deserialize_u64()
+            deserialize_u128()
+            deserialize_f32()
+            deserialize_f64()
+            deserialize_char()
+            deserialize_str()
+            deserialize_string()
+            deserialize_bytes()
+            deserialize_byte_buf()
+            deserialize_option()
+            deserialize_unit()
+            deserialize_unit_struct(name: &'static str)
+            deserialize_newtype_struct(name: &'static str)
+            deserialize_seq()
+            deserialize_tuple(len: usize)
+            deserialize_tuple_struct(name: &'static str, len: usize)
+            deserialize_map()
+            deserialize_struct(name: &'static str, fields: &'static [&'static str])
+            deserialize_enum(name: &'static str, variants: &'static [&'static str])
+            deserialize_identifier()
+            deserialize_ignored_any()
+        ];
+    };
+
+    ($($meth:ident($($arg:ident: $ty:ty),*))*) => {
+        $(
+            fn $meth<V>(self, $($arg: $ty,)* visitor: V) -> Result<V::Value, Self::Error>
+            where
+              V: Visitor<'de>,
+            {
+                match self.node {
+                    Node::Scalar(s) => s
+                        .into_deserializer()
+                        .$meth($($arg,)* visitor),
+                    Node::Mapping(m) => m
+                        .into_deserializer()
+                        .$meth($($arg,)* visitor),
+                    Node::Sequence(s) => s
+                        .into_deserializer()
+                        .$meth($($arg,)* visitor),
+                }
+            }
+        )*
+    };
+}
+
 impl<'de> Deserializer<'de> for NodeDeserializer<'de> {
     type Error = Error;
 
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        match self.node {
-            Node::Scalar(s) => s.into_deserializer().deserialize_any(visitor),
-            Node::Mapping(m) => m.into_deserializer().deserialize_any(visitor),
-            Node::Sequence(s) => s.into_deserializer().deserialize_any(visitor),
-        }
-    }
-
-    fn deserialize_struct<V>(
-        self,
-        name: &'static str,
-        fields: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        match self.node {
-            Node::Scalar(s) => s
-                .into_deserializer()
-                .deserialize_struct(name, fields, visitor),
-            Node::Mapping(m) => m
-                .into_deserializer()
-                .deserialize_struct(name, fields, visitor),
-            Node::Sequence(s) => s
-                .into_deserializer()
-                .deserialize_struct(name, fields, visitor),
-        }
-    }
-
-    forward_to_deserialize_any! [
-        bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
-        option unit unit_struct newtype_struct seq tuple tuple_struct map
-        enum identifier ignored_any
-    ];
+    forward_to_nodes!();
 }
 
 // -------------------------------------------------------------------------------
@@ -490,6 +537,33 @@ pub struct MarkedScalarNodeDeserializer<'node> {
     node: &'node MarkedScalarNode,
 }
 
+macro_rules! scalar_fromstr {
+    () => {
+        scalar_fromstr!(deserialize_u8 visit_u8 u8);
+        scalar_fromstr!(deserialize_u16 visit_u16 u16);
+        scalar_fromstr!(deserialize_u32 visit_u32 u32);
+        scalar_fromstr!(deserialize_u64 visit_u64 u64);
+        scalar_fromstr!(deserialize_u128 visit_u128 u128);
+        scalar_fromstr!(deserialize_i8 visit_i8 i8);
+        scalar_fromstr!(deserialize_i16 visit_i16 i16);
+        scalar_fromstr!(deserialize_i32 visit_i32 i32);
+        scalar_fromstr!(deserialize_i64 visit_i64 i64);
+        scalar_fromstr!(deserialize_i128 visit_i128 i128);
+        scalar_fromstr!(deserialize_f32 visit_f32 f32);
+        scalar_fromstr!(deserialize_f64 visit_f64 f64);
+    };
+
+    ($meth:ident $visit:ident $ty:ty) => {
+        fn $meth<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: Visitor<'de>,
+        {
+            let value: $ty = self.node.as_str().parse()?;
+            visitor.$visit(value)
+        }
+    };
+}
+
 impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
     type Error = Error;
 
@@ -514,6 +588,8 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
         )
     }
 
+    scalar_fromstr!();
+
     fn deserialize_struct<V>(
         self,
         name: &'static str,
@@ -531,7 +607,7 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
     }
 
     forward_to_deserialize_any! [
-        i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
+        char str string bytes byte_buf
         option unit unit_struct newtype_struct seq tuple tuple_struct map
         enum identifier ignored_any
     ];
@@ -718,6 +794,10 @@ mod test {
     const TEST_DOC: &str = r#"hello: world
 some: [ value, or, other ]
 says: { grow: nothing, or: die }
+numbers: [ 1, 2, 3, 500 ]
+success: true
+failure: False
+shouting: TRUE
 "#;
 
     #[test]
@@ -756,6 +836,59 @@ says: { grow: nothing, or: die }
             hello: Spanned<String>,
             some: Spanned<Vec<Spanned<String>>>,
             says: Spanned<HashMap<Spanned<String>, Spanned<String>>>,
+        }
+        let node = crate::parse_yaml(0, TEST_DOC).unwrap();
+        let doc: Spanned<TestDoc> = from_node(&node).unwrap();
+        println!("{doc:#?}");
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn basic_deserialize_numbers() {
+        #[derive(Deserialize, Debug)]
+        struct TestDoc {
+            numbers: Vec<u16>,
+        }
+        let node = crate::parse_yaml(0, TEST_DOC).unwrap();
+        let doc: Spanned<TestDoc> = from_node(&node).unwrap();
+        println!("{doc:#?}");
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn basic_deserialize_bad_numbers() {
+        #[derive(Deserialize, Debug)]
+        struct TestDoc {
+            numbers: Vec<u8>,
+        }
+        let node = crate::parse_yaml(0, TEST_DOC).unwrap();
+        let err = from_node::<TestDoc>(&node).err().unwrap();
+        match err {
+            Error::IntegerParseFailure(_e) => (),
+            _ => panic!("Unexpected error"),
+        }
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn basic_deserialize_spanned_numbers() {
+        #[derive(Deserialize, Debug)]
+        struct TestDoc {
+            numbers: Vec<Spanned<i128>>,
+        }
+        let node = crate::parse_yaml(0, TEST_DOC).unwrap();
+        let doc: Spanned<TestDoc> = from_node(&node).unwrap();
+        println!("{doc:#?}");
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn basic_deserialize_bools() {
+        #[derive(Deserialize, Debug)]
+        struct TestDoc {
+            success: bool,
+            failure: Spanned<bool>,
+            shouting: Spanned<bool>,
         }
         let node = crate::parse_yaml(0, TEST_DOC).unwrap();
         let doc: Spanned<TestDoc> = from_node(&node).unwrap();
