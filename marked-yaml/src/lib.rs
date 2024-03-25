@@ -47,4 +47,4 @@ pub mod spanned_serde;
 
 #[cfg(feature = "serde")]
 #[doc(inline)]
-pub use spanned_serde::{from_node, Spanned};
+pub use spanned_serde::{from_node, Error, Spanned};
