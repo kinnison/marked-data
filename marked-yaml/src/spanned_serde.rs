@@ -932,6 +932,73 @@ impl<'de> MapAccess<'de> for MappingAccess<'de> {
 
 // -------------------------------------------------------------------------------
 
+struct MarkedMappingNodeEnumAccess<'de> {
+    node: &'de MarkedMappingNode,
+}
+
+impl<'de> MarkedMappingNodeEnumAccess<'de> {
+    fn first(&self) -> &'de Node {
+        self.node
+            .values()
+            .next()
+            .expect("variant accessed before variant seed")
+    }
+}
+
+impl<'de> EnumAccess<'de> for MarkedMappingNodeEnumAccess<'de> {
+    type Error = Error;
+    type Variant = Self;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: serde::de::DeserializeSeed<'de>,
+    {
+        if let Some(first) = self.node.keys().next() {
+            seed.deserialize(first.into_deserializer())
+                .map(|v| (v, self))
+        } else {
+            Err(serde::de::Error::custom(
+                "Unexpected empty map when looking for enum variant",
+            ))
+        }
+    }
+}
+
+impl<'de> VariantAccess<'de> for MarkedMappingNodeEnumAccess<'de> {
+    type Error = Error;
+
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        Err(serde::de::Error::invalid_type(Unexpected::Map, &"String"))
+    }
+
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: serde::de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(self.first().into_deserializer())
+    }
+
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.first().into_deserializer().deserialize_seq(visitor)
+    }
+
+    fn struct_variant<V>(
+        self,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.first().into_deserializer().deserialize_map(visitor)
+    }
+}
+
+// -------------------------------------------------------------------------------
+
 impl<'de> IntoDeserializer<'de, Error> for &'de MarkedMappingNode {
     type Deserializer = MarkedMappingNodeDeserializer<'de>;
 
@@ -979,10 +1046,30 @@ impl<'de> Deserializer<'de> for MarkedMappingNodeDeserializer<'de> {
         visitor.visit_some(self)
     }
 
+    fn deserialize_enum<V>(
+        self,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        match self.node.len() {
+            0 => Err(serde::de::Error::custom(
+                "Expected map with one value, got empty map",
+            )),
+            1 => visitor.visit_enum(MarkedMappingNodeEnumAccess { node: self.node }),
+            n => Err(serde::de::Error::custom(format!(
+                "Expected map with one value, got {n} values"
+            ))),
+        }
+    }
+
     forward_to_deserialize_any! [
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
         unit unit_struct newtype_struct seq tuple tuple_struct
-        map enum identifier ignored_any
+        map identifier ignored_any
     ];
 }
 

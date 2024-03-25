@@ -14,6 +14,10 @@ u8s: [ 0, 1, 2, 255 ]
 i8s: [ -128, 0, 127 ]
 u32s: [ 65537 ]
 thingy: blue
+outcome: 
+    bad: stuff
+looksee: { ugly: [ first, second ] }
+known: { unknown: { name: Jeff, age: 14 } }
 "#;
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +29,22 @@ struct FullTest {
     u32s: Vec<u32>,
     missing: Option<String>,
     thingy: Colour,
+    outcome: EnumCheck,
+    looksee: EnumCheck,
+    known: EnumCheck,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+enum EnumCheck {
+    #[serde(alias = "good")]
+    Good(String),
+    #[serde(alias = "bad")]
+    Bad(Spanned<String>),
+    #[serde(alias = "ugly")]
+    Ugly(String, String),
+    #[serde(alias = "unknown")]
+    Unknown { name: Spanned<String>, age: i64 },
 }
 
 #[derive(Deserialize, Debug)]
