@@ -24,6 +24,15 @@ struct FullTest {
     i8s: Vec<i8>,
     u32s: Vec<u32>,
     missing: Option<String>,
+    thingy: Colour,
+}
+
+#[derive(Deserialize, Debug)]
+enum Colour {
+    #[serde(alias = "blue")]
+    Blue,
+    #[serde(alias = "red")]
+    Red,
 }
 
 #[test]
