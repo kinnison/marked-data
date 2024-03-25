@@ -203,6 +203,8 @@ pub enum Error {
     IntegerParseFailure(ParseIntError, Span),
     /// Failed to parse float
     FloatParseFailure(ParseFloatError, Span),
+    /// An unknown field was encountered
+    UnknownFieldError(String, &'static [&'static str], Span),
     /// Some other error occurred
     Other(Box<dyn std::error::Error>, Span),
 }
@@ -213,6 +215,7 @@ impl Error {
             Error::NotBoolean(s) => s,
             Error::IntegerParseFailure(_, s) => s,
             Error::FloatParseFailure(_, s) => s,
+            Error::UnknownFieldError(_, _, s) => s,
             Error::Other(_, s) => s,
         };
         *spanloc = span;
@@ -260,6 +263,7 @@ impl Error {
             Error::NotBoolean(s) => s,
             Error::IntegerParseFailure(_, s) => s,
             Error::FloatParseFailure(_, s) => s,
+            Error::UnknownFieldError(_, _, s) => s,
             Error::Other(_, s) => s,
         };
         spanloc.start().copied()
@@ -272,6 +276,23 @@ impl fmt::Display for Error {
             Error::NotBoolean(_) => f.write_str("Value was not a boolean"),
             Error::IntegerParseFailure(e, _) => e.fmt(f),
             Error::FloatParseFailure(e, _) => e.fmt(f),
+            Error::UnknownFieldError(field, expected, _) => match expected.len() {
+                0 => write!(f, "Unknown field `{field}`, there are no fields"),
+                1 => write!(f, "Unknown field `{field}`, expected `{}`", expected[0]),
+                2 => write!(
+                    f,
+                    "Unknown field `{field}`, expected `{}` or `{}`",
+                    expected[0], expected[1]
+                ),
+                _ => {
+                    write!(f, "Unknown field `{field}`, expected one of ")?;
+                    let last = expected[expected.len() - 1];
+                    for v in expected[..=expected.len() - 2].iter() {
+                        write!(f, "`{v}`, ")?;
+                    }
+                    write!(f, "or `{last}`")
+                }
+            },
             Error::Other(e, _) => e.fmt(f),
         }
     }
@@ -285,6 +306,10 @@ impl serde::de::Error for Error {
         T: fmt::Display,
     {
         Error::Other(msg.to_string().into(), Span::new_blank())
+    }
+
+    fn unknown_field(field: &str, expected: &'static [&'static str]) -> Self {
+        Self::UnknownFieldError(field.to_string(), expected, Span::new_blank())
     }
 }
 
@@ -366,6 +391,7 @@ pub type FromNodeError = serde_path_to_error::Error<Error>;
 /// assert_eq!(start.line(), 1);
 /// assert_eq!(start.column(), 8);
 /// ```
+#[allow(clippy::result_large_err)]
 pub fn from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
 where
     T: Deserialize<'de>,
@@ -391,12 +417,14 @@ where
             if e.inner().start_mark().is_none() {
                 let p = e.path().clone();
                 let mut e = e.into_inner();
+                let mut prev_best_node = node;
                 let mut best_node = node;
                 for seg in p.iter() {
                     match seg {
                         Segment::Seq { index } => {
                             if let Some(seq) = best_node.as_sequence() {
                                 if let Some(node) = seq.get(*index) {
+                                    prev_best_node = best_node;
                                     best_node = node;
                                 } else {
                                     // We can't traverse this?
@@ -412,6 +440,7 @@ where
                                 // What we want here is the entry which matches the key
                                 // if there is one
                                 if let Some(node) = map.get(key.as_str()) {
+                                    prev_best_node = best_node;
                                     best_node = node;
                                 } else {
                                     // We can't traverse this?
@@ -426,7 +455,19 @@ where
                         Segment::Unknown => break,
                     }
                 }
-                e.set_span(*best_node.span());
+                let mut best_span = *best_node.span();
+                if let Error::UnknownFieldError(field, _, _) = &e {
+                    // We actually would prefer to point at the key not the value,
+                    if let Some(map) = prev_best_node.as_mapping() {
+                        for (k, _) in map.iter() {
+                            if k.as_str() == field.as_str() {
+                                best_span = *k.span();
+                                break;
+                            }
+                        }
+                    }
+                }
+                e.set_span(best_span);
                 serde_path_to_error::Error::new(p, e)
             } else {
                 e
@@ -1068,5 +1109,28 @@ shouting: TRUE
         let node = crate::parse_yaml(0, TEST_DOC).unwrap();
         let doc: Spanned<TestDoc> = from_node(&node).unwrap();
         println!("{doc:#?}");
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn disallowed_keys() {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct TestDoc {
+            success: bool,
+        }
+        let node = crate::parse_yaml(0, TEST_DOC).unwrap();
+        let err = from_node::<TestDoc>(&node).err().unwrap();
+        #[cfg(feature = "serde-path")]
+        let err = {
+            assert_eq!(err.path().to_string(), "hello");
+            let err = err.into_inner();
+            let mark = err.start_mark().unwrap();
+            assert_eq!(mark.source(), 0);
+            assert_eq!(mark.line(), 1);
+            assert_eq!(mark.column(), 1);
+            err
+        };
+        assert!(matches!(err, Error::UnknownFieldError(_, _, _)));
     }
 }
