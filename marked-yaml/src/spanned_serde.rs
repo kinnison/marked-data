@@ -793,9 +793,17 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
         self.deserialize_any(visitor)
     }
 
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        // Since we're here, there is no none, so visit as a some
+        visitor.visit_some(self)
+    }
+
     forward_to_deserialize_any! [
         char str string bytes byte_buf
-        option unit unit_struct newtype_struct seq tuple tuple_struct map
+        unit unit_struct newtype_struct seq tuple tuple_struct map
         enum identifier ignored_any
     ];
 }
@@ -884,9 +892,17 @@ impl<'de> Deserializer<'de> for MarkedMappingNodeDeserializer<'de> {
         self.deserialize_any(visitor)
     }
 
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        // Since we're here, there is no none, so visit as a some
+        visitor.visit_some(self)
+    }
+
     forward_to_deserialize_any! [
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
-        option unit unit_struct newtype_struct seq tuple tuple_struct
+        unit unit_struct newtype_struct seq tuple tuple_struct
         map enum identifier ignored_any
     ];
 }
@@ -963,9 +979,17 @@ impl<'de> Deserializer<'de> for MarkedSequenceNodeDeserializer<'de> {
         self.deserialize_any(visitor)
     }
 
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        // Since we're here, there is no none, so visit as a some
+        visitor.visit_some(self)
+    }
+
     forward_to_deserialize_any! [
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
-        option unit unit_struct newtype_struct seq tuple tuple_struct
+        unit unit_struct newtype_struct seq tuple tuple_struct
         map enum identifier ignored_any
     ];
 }
