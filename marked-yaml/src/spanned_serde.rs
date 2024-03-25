@@ -238,6 +238,14 @@ impl Error {
     ///
     /// let nodes = parse_yaml(0, YAML).unwrap();
     /// let err = from_node::<Example>(&nodes).err().unwrap();
+    #[cfg_attr(
+        feature = "serde-path",
+        doc = "// Extract our error from the path-to-error\n// Not necessary if not using the serde-path feature\nlet err = err.into_inner();"
+    )]
+    #[cfg_attr(
+        not(feature = "serde-path"),
+        doc = "// If using the serde-path feature, you would need to\n// extract our error from the path-to-error\n// let err = err.into_inner();"
+    )]
     ///
     /// assert!(matches!(err, Error::FloatParseFailure(_,_)));
     ///
@@ -331,6 +339,12 @@ impl<'node> NodeDeserializer<'node> {
     }
 }
 
+#[cfg(not(feature = "serde-path"))]
+pub type FromNodeError = Error;
+
+#[cfg(feature = "serde-path")]
+pub type FromNodeError = serde_path_to_error::Error<Error>;
+
 /// Deserialize some [`Node`] into the requisite type
 ///
 /// This permits deserialisation of [`Node`]s into any structure
@@ -352,11 +366,75 @@ impl<'node> NodeDeserializer<'node> {
 /// assert_eq!(start.line(), 1);
 /// assert_eq!(start.column(), 8);
 /// ```
-pub fn from_node<'de, T>(node: &'de Node) -> Result<T, Error>
+pub fn from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
 where
     T: Deserialize<'de>,
 {
-    T::deserialize(NodeDeserializer::new(node))
+    #[cfg(not(feature = "serde-path"))]
+    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, Error>
+    where
+        T: Deserialize<'de>,
+    {
+        T::deserialize(NodeDeserializer::new(node))
+    }
+
+    #[cfg(feature = "serde-path")]
+    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, serde_path_to_error::Error<Error>>
+    where
+        T: Deserialize<'de>,
+    {
+        use serde_path_to_error::Segment;
+
+        let p2e: Result<T, _> = serde_path_to_error::deserialize(NodeDeserializer::new(node));
+
+        p2e.map_err(|e| {
+            if e.inner().start_mark().is_none() {
+                let p = e.path().clone();
+                let mut e = e.into_inner();
+                let mut best_node = node;
+                for seg in p.iter() {
+                    match seg {
+                        Segment::Seq { index } => {
+                            if let Some(seq) = best_node.as_sequence() {
+                                if let Some(node) = seq.get(*index) {
+                                    best_node = node;
+                                } else {
+                                    // We can't traverse this?
+                                    break;
+                                }
+                            } else {
+                                // We can't traverse this?
+                                break;
+                            }
+                        }
+                        Segment::Map { key } => {
+                            if let Some(map) = best_node.as_mapping() {
+                                // What we want here is the entry which matches the key
+                                // if there is one
+                                if let Some(node) = map.get(key.as_str()) {
+                                    best_node = node;
+                                } else {
+                                    // We can't traverse this?
+                                    break;
+                                }
+                            } else {
+                                // We can't traverse this?
+                                break;
+                            }
+                        }
+                        Segment::Enum { .. } => break,
+                        Segment::Unknown => break,
+                    }
+                }
+                e.set_span(*best_node.span());
+                serde_path_to_error::Error::new(p, e)
+            } else {
+                e
+            }
+        })
+    }
+
+    inner_from_node(node)
 }
 
 macro_rules! forward_to_nodes {
@@ -924,6 +1002,7 @@ shouting: TRUE
 
     #[test]
     #[allow(dead_code)]
+    #[cfg(not(feature = "serde-path"))]
     fn basic_deserialize_bad_numbers() {
         #[derive(Deserialize, Debug)]
         struct TestDoc {
@@ -931,6 +1010,29 @@ shouting: TRUE
         }
         let node = crate::parse_yaml(0, TEST_DOC).unwrap();
         let err = from_node::<TestDoc>(&node).err().unwrap();
+        match err {
+            Error::IntegerParseFailure(_e, s) => {
+                let start = s.start().unwrap();
+                assert_eq!(start.source(), 0);
+                assert_eq!(start.line(), 4);
+                assert_eq!(start.column(), 21);
+            }
+            _ => panic!("Unexpected error"),
+        }
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    #[cfg(feature = "serde-path")]
+    fn basic_deserialize_bad_numbers() {
+        #[derive(Deserialize, Debug)]
+        struct TestDoc {
+            numbers: Vec<u8>,
+        }
+        let node = crate::parse_yaml(0, TEST_DOC).unwrap();
+        let err = from_node::<TestDoc>(&node).err().unwrap();
+        assert_eq!(err.path().to_string(), "numbers[3]");
+        let err = err.into_inner();
         match err {
             Error::IntegerParseFailure(_e, s) => {
                 let start = s.start().unwrap();
