@@ -40,6 +40,7 @@ pub enum LoadError {
 }
 
 /// Options for loading YAML
+#[derive(Debug, Default)]
 pub struct LoaderOptions {
     /// If true, duplicate keys in mappings will cause an error. If false,
     /// the last key will be used.

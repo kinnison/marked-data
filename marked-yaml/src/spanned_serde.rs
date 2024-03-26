@@ -491,13 +491,7 @@ pub fn from_yaml<T>(source: usize, yaml: &str) -> Result<T, FromYamlError>
 where
     T: DeserializeOwned,
 {
-    from_yaml_with_options(
-        source,
-        yaml,
-        LoaderOptions {
-            error_on_duplicate_keys: false,
-        },
-    )
+    from_yaml_with_options(source, yaml, LoaderOptions::default())
 }
 
 /// Deserialize some YAML into the requisite type
@@ -516,10 +510,7 @@ where
 /// struct Greeting {
 ///     hello: Spanned<String>,
 /// }
-/// let options = LoaderOptions {
-///     error_on_duplicate_keys: true,
-/// };
-/// let greets: Greeting = marked_yaml::from_yaml_with_options(0, YAML, options).unwrap();
+/// let greets: Greeting = marked_yaml::from_yaml_with_options(0, YAML, LoaderOptions::default()).unwrap();
 /// let start = greets.hello.span().start().unwrap();
 /// assert_eq!(start.line(), 1);
 /// assert_eq!(start.column(), 8);
