@@ -11,15 +11,15 @@ use std::{
 
 use serde::{
     de::{
-        value::BorrowedStrDeserializer, EnumAccess, IntoDeserializer, MapAccess, SeqAccess,
-        Unexpected, VariantAccess, Visitor,
+        value::BorrowedStrDeserializer, DeserializeOwned, EnumAccess, IntoDeserializer, MapAccess,
+        SeqAccess, Unexpected, VariantAccess, Visitor,
     },
     forward_to_deserialize_any, Deserialize, Deserializer, Serialize,
 };
 
 use crate::{
     types::{MarkedMappingNode, MarkedScalarNode, MarkedSequenceNode},
-    Marker, Node, Span,
+    LoaderOptions, Marker, Node, Span,
 };
 
 /// Wrapper which can be used when deserialising data from [`Node`]
@@ -359,6 +359,8 @@ impl<'node> NodeDeserializer<'node> {
     }
 }
 
+// -------------------------------------------------------------------------------
+
 /// The error returned by [`from_node`]
 ///
 /// From here you can get the logical path to the error if
@@ -400,6 +402,114 @@ impl fmt::Display for FromNodeError {
         }
     }
 }
+
+// -------------------------------------------------------------------------------
+
+/// Errors which can occur when deserialising from YAML
+#[derive(Debug)]
+pub enum FromYamlError {
+    ParseYaml(crate::LoadError),
+    FromNode(FromNodeError),
+}
+
+impl fmt::Display for FromYamlError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FromYamlError::ParseYaml(e) => write!(f, "{e}"),
+            FromYamlError::FromNode(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for FromYamlError {}
+
+impl From<crate::LoadError> for FromYamlError {
+    fn from(value: crate::LoadError) -> Self {
+        Self::ParseYaml(value)
+    }
+}
+
+impl From<FromNodeError> for FromYamlError {
+    fn from(value: FromNodeError) -> Self {
+        Self::FromNode(value)
+    }
+}
+
+// -------------------------------------------------------------------------------
+
+/// Deserialize some YAML into the requisite type
+///
+/// This permits deserialisation of a YAML string into
+/// any structure which [`serde`] can deserialize.  In
+/// addition, if any part of the type tree is [`Spanned`]
+/// then the spans are provided from the requisite marked
+/// node.
+///
+/// ```
+/// # use serde::Deserialize;
+/// # use marked_yaml::Spanned;
+/// const YAML: &str = "hello: world\n";
+/// #[derive(Deserialize)]
+/// struct Greeting {
+///     hello: Spanned<String>,
+/// }
+/// let greets: Greeting = marked_yaml::from_yaml(0, YAML).unwrap();
+/// let start = greets.hello.span().start().unwrap();
+/// assert_eq!(start.line(), 1);
+/// assert_eq!(start.column(), 8);
+/// ```
+#[allow(clippy::result_large_err)]
+pub fn from_yaml<T>(source: usize, yaml: &str) -> Result<T, FromYamlError>
+where
+    T: DeserializeOwned,
+{
+    from_yaml_with_options(
+        source,
+        yaml,
+        LoaderOptions {
+            error_on_duplicate_keys: false,
+        },
+    )
+}
+
+/// Deserialize some YAML into the requisite type
+///
+/// This permits deserialisation of a YAML string into
+/// any structure which [`serde`] can deserialize.  In
+/// addition, if any part of the type tree is [`Spanned`]
+/// then the spans are provided from the requisite marked
+/// node.
+///
+/// ```
+/// # use serde::Deserialize;
+/// # use marked_yaml::{Spanned, LoaderOptions};
+/// const YAML: &str = "hello: world\n";
+/// #[derive(Deserialize)]
+/// struct Greeting {
+///     hello: Spanned<String>,
+/// }
+/// let options = LoaderOptions {
+///     error_on_duplicate_keys: true,
+/// };
+/// let greets: Greeting = marked_yaml::from_yaml_with_options(0, YAML, options).unwrap();
+/// let start = greets.hello.span().start().unwrap();
+/// assert_eq!(start.line(), 1);
+/// assert_eq!(start.column(), 8);
+/// ```
+#[allow(clippy::result_large_err)]
+pub fn from_yaml_with_options<T>(
+    source: usize,
+    yaml: &str,
+    options: LoaderOptions,
+) -> Result<T, FromYamlError>
+where
+    T: DeserializeOwned,
+{
+    let node = crate::parse_yaml_with_options(source, yaml, options)?;
+    Ok(from_node(&node)?)
+}
+
+// -------------------------------------------------------------------------------
 
 /// Deserialize some [`Node`] into the requisite type
 ///
@@ -541,6 +651,8 @@ fn render_path(path: &serde_path_to_error::Path) -> String {
     }
     ret
 }
+
+// -------------------------------------------------------------------------------
 
 macro_rules! forward_to_nodes {
     () => {
