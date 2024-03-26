@@ -130,8 +130,10 @@ impl MarkedEventReceiver for MarkedLoader {
                 assert_eq!(curstate, StartStream);
                 StartDocument
             }
-            Event::MappingStart(aid) => {
-                if aid == 0 {
+            Event::MappingStart(aid, tag) => {
+                if tag.is_some() {
+                    Error(LoadError::UnexpectedTag(mark))
+                } else if aid == 0 {
                     match curstate {
                         StartDocument => MappingWaitingOnKey(mark, MappingHash::new()),
                         MappingWaitingOnKey(_, _) => Error(LoadError::MappingKeyMustBeScalar(mark)),
@@ -185,8 +187,10 @@ impl MarkedEventReceiver for MarkedLoader {
                 }
                 _ => unreachable!(),
             },
-            Event::SequenceStart(aid) => {
-                if aid == 0 {
+            Event::SequenceStart(aid, tag) => {
+                if tag.is_some() {
+                    Error(LoadError::UnexpectedTag(mark))
+                } else if aid == 0 {
                     match curstate {
                         StartDocument => Error(LoadError::TopLevelMustBeMapping(mark)),
                         MappingWaitingOnKey(_, _) => Error(LoadError::MappingKeyMustBeScalar(mark)),

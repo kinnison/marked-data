@@ -12,5 +12,13 @@ came from.
 
 Currently we provide:
 
-* `marked-data`: The core data mark library
 * `marked-yaml`: A deliberately simplified YAML subset which supports data marking
+
+## Marked YAML
+
+The `marked-yaml` library offers a subset of YAML designed for configuration files
+and similar use.  The data it reads in is "marked" with its origin.  If you want
+to use `marked-yaml` with your existing `serde` applications, you can enable the
+`serde` feature, and if you want the errors produced by the `marked-yaml`
+deserializer to include nice paths to any problem, along with ensuring the marker
+for the problem area is populated in any errors, use the `serde-path` feature.
