@@ -244,16 +244,8 @@ impl Error {
     ///
     /// let nodes = parse_yaml(0, YAML).unwrap();
     /// let err = from_node::<Example>(&nodes).err().unwrap();
-    #[cfg_attr(
-        feature = "serde-path",
-        doc = "// Extract our error from the path-to-error\n// Not necessary if not using the serde-path feature\nlet err = err.into_inner();"
-    )]
-    #[cfg_attr(
-        not(feature = "serde-path"),
-        doc = "// If using the serde-path feature, you would need to\n// extract our error from the path-to-error\n// let err = err.into_inner();"
-    )]
     ///
-    /// assert!(matches!(err, Error::FloatParseFailure(_,_)));
+    /// assert!(matches!(&*err, Error::FloatParseFailure(_,_)));
     ///
     /// let mark = err.start_mark().unwrap();
     ///
@@ -367,11 +359,47 @@ impl<'node> NodeDeserializer<'node> {
     }
 }
 
-#[cfg(not(feature = "serde-path"))]
-pub type FromNodeError = Error;
+/// The error returned by [`from_node`]
+///
+/// From here you can get the logical path to the error if
+/// one is available, and then via the error: the marker
+/// indicating where the error occurred if it's available.
+/// Finally you may extract the error itself.
+#[derive(Debug)]
+pub struct FromNodeError {
+    error: Error,
+    path: Option<String>,
+}
 
-#[cfg(feature = "serde-path")]
-pub type FromNodeError = serde_path_to_error::Error<Error>;
+impl FromNodeError {
+    /// The logical path representing where the error occurred
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
+    }
+
+    /// Extract the inner error
+    pub fn into_inner(self) -> Error {
+        self.error
+    }
+}
+
+impl Deref for FromNodeError {
+    type Target = Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.error
+    }
+}
+
+impl fmt::Display for FromNodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(path) = self.path() {
+            write!(f, "{}: {}", path, self.error)
+        } else {
+            (&self.error as &dyn fmt::Display).fmt(f)
+        }
+    }
+}
 
 /// Deserialize some [`Node`] into the requisite type
 ///
@@ -400,15 +428,18 @@ where
     T: Deserialize<'de>,
 {
     #[cfg(not(feature = "serde-path"))]
-    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, Error>
+    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
     where
         T: Deserialize<'de>,
     {
-        T::deserialize(NodeDeserializer::new(node))
+        T::deserialize(NodeDeserializer::new(node)).map_err(|e| FromNodeError {
+            error: e,
+            path: None,
+        })
     }
 
     #[cfg(feature = "serde-path")]
-    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, serde_path_to_error::Error<Error>>
+    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
     where
         T: Deserialize<'de>,
     {
@@ -419,6 +450,7 @@ where
         p2e.map_err(|e| {
             if e.inner().start_mark().is_none() {
                 let p = e.path().clone();
+                let path = render_path(&p);
                 let mut e = e.into_inner();
                 let mut prev_best_node = node;
                 let mut best_node = node;
@@ -471,14 +503,43 @@ where
                     }
                 }
                 e.set_span(best_span);
-                serde_path_to_error::Error::new(p, e)
+                FromNodeError {
+                    error: e,
+                    path: Some(path),
+                }
             } else {
-                e
+                let path = render_path(e.path());
+                FromNodeError {
+                    error: e.into_inner(),
+                    path: Some(path),
+                }
             }
         })
     }
 
     inner_from_node(node)
+}
+
+#[cfg(feature = "serde-path")]
+fn render_path(path: &serde_path_to_error::Path) -> String {
+    use serde_path_to_error::Segment::*;
+    use std::fmt::Write;
+    let mut ret = String::new();
+    let mut separator = "";
+    for segment in path.iter() {
+        if let Map { key } = segment {
+            if key == SPANNED_INNER {
+                continue;
+            }
+        }
+        if !matches!(segment, Seq { .. }) {
+            write!(ret, "{separator}{segment}").expect("Cannot format");
+        } else {
+            write!(ret, "{segment}").expect("Cannot format");
+        }
+        separator = ".";
+    }
+    ret
 }
 
 macro_rules! forward_to_nodes {
@@ -1240,7 +1301,7 @@ shouting: TRUE
             numbers: Vec<u8>,
         }
         let node = crate::parse_yaml(0, TEST_DOC).unwrap();
-        let err = from_node::<TestDoc>(&node).err().unwrap();
+        let err = from_node::<TestDoc>(&node).err().unwrap().into_inner();
         match err {
             Error::IntegerParseFailure(_e, s) => {
                 let start = s.start().unwrap();
@@ -1262,7 +1323,7 @@ shouting: TRUE
         }
         let node = crate::parse_yaml(0, TEST_DOC).unwrap();
         let err = from_node::<TestDoc>(&node).err().unwrap();
-        assert_eq!(err.path().to_string(), "numbers[3]");
+        assert_eq!(err.path(), Some("numbers[3]"));
         let err = err.into_inner();
         match err {
             Error::IntegerParseFailure(_e, s) => {
@@ -1312,15 +1373,13 @@ shouting: TRUE
         let node = crate::parse_yaml(0, TEST_DOC).unwrap();
         let err = from_node::<TestDoc>(&node).err().unwrap();
         #[cfg(feature = "serde-path")]
-        let err = {
-            assert_eq!(err.path().to_string(), "hello");
-            let err = err.into_inner();
+        {
+            assert_eq!(err.path(), Some("hello"));
             let mark = err.start_mark().unwrap();
             assert_eq!(mark.source(), 0);
             assert_eq!(mark.line(), 1);
             assert_eq!(mark.column(), 1);
-            err
         };
-        assert!(matches!(err, Error::UnknownFieldError(_, _, _)));
+        assert!(matches!(&*err, Error::UnknownFieldError(_, _, _)));
     }
 }
