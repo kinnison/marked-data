@@ -1,6 +1,7 @@
 //! Serde support for marked data deserialisation
 
 use std::{
+    borrow::Borrow,
     fmt,
     hash::Hash,
     iter::Peekable,
@@ -62,6 +63,21 @@ where
     }
 }
 
+impl<T> PartialEq<T> for Spanned<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &T) -> bool {
+        (&self.inner as &dyn PartialEq<T>).eq(other)
+    }
+}
+
+impl PartialEq<str> for Spanned<String> {
+    fn eq(&self, other: &str) -> bool {
+        self.inner == other
+    }
+}
+
 impl<T> Eq for Spanned<T> where T: Eq {}
 
 impl<T> Hash for Spanned<T>
@@ -70,6 +86,18 @@ where
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner.hash(state);
+    }
+}
+
+impl Borrow<str> for Spanned<String> {
+    fn borrow(&self) -> &str {
+        self.inner.borrow()
+    }
+}
+
+impl Borrow<str> for Spanned<&'_ str> {
+    fn borrow(&self) -> &str {
+        self.inner
     }
 }
 
