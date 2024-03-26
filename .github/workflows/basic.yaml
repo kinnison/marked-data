@@ -48,7 +48,7 @@ jobs:
         shell: bash
         id: rustc
         run: |
-          echo "::set-output name=commit_hash::$(rustc -vV | grep commit-hash | cut -b14-23)"
+          echo "commit_hash=$(rustc -vV | grep commit-hash | cut -b14-23)" >> $GITHUB_OUTPUT
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -68,17 +68,17 @@ jobs:
         name: Build the library in debug mode
         with:
           command: build
-          args: --all
+          args: --all --all-features
       - uses: actions-rs/cargo@v1
         name: Run the tests
         with:
           command: test
-          args: --all
+          args: --all --all-features
       - uses: actions-rs/cargo@v1
         name: Run clippy
         with:
           command: clippy
-          args: --all
+          args: --all --all-features
         if: matrix.clippyetc
       - uses: actions-rs/cargo@v1
         name: Check formatting

@@ -1352,7 +1352,7 @@ mod test {
         assert_eq!(seq.span().start(), Some(&Marker::new(0, 24, 3)));
         assert_eq!(seq.span(), map.get_node("heterogenous").unwrap().span());
         // Helpers for the sequence node
-        assert_eq!(seq.get_node(0), seq.get(0));
+        assert_eq!(seq.get_node(0), seq.first());
         assert_ne!(seq.get_node(0), None);
         assert_ne!(seq.get_scalar(0), None);
         assert_ne!(seq.get_mapping(1), None);
