@@ -2,7 +2,9 @@
 //! All these tests require serde
 //!
 
-use marked_yaml::{from_node, parse_yaml, Spanned};
+use std::collections::HashMap;
+
+use marked_yaml::{from_node, from_yaml, parse_yaml, Spanned};
 use serde::Deserialize;
 
 const TEST_DOC: &str = r#"# Line one is a comment
@@ -18,6 +20,10 @@ outcome:
     bad: stuff
 looksee: { ugly: [ first, second ] }
 known: { unknown: { name: Jeff, age: 14 } }
+kvs:
+    first: one
+    second: two
+    third: banana
 "#;
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +38,7 @@ struct FullTest {
     outcome: EnumCheck,
     looksee: EnumCheck,
     known: EnumCheck,
+    kvs: HashMap<Spanned<String>, Spanned<String>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -60,4 +67,10 @@ fn read_everything() {
     let nodes = parse_yaml(0, TEST_DOC).unwrap();
     let doc: FullTest = from_node(&nodes).unwrap();
     println!("{doc:?}");
+}
+
+#[test]
+fn ergonomics() {
+    let doc: FullTest = from_yaml(0, TEST_DOC).unwrap();
+    assert_eq!(doc.kvs.get("first").map(|s| s.as_str()), Some("one"));
 }
