@@ -4,10 +4,8 @@
 use doc_comment::doc_comment;
 use hashlink::LinkedHashMap;
 use std::borrow::{Borrow, Cow};
-use std::convert::TryFrom;
 use std::fmt::{self, Display};
 use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 use yaml_rust::Yaml as YamlNode;
 
