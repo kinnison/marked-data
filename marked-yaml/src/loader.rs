@@ -3,7 +3,7 @@
 
 use crate::types::*;
 
-use linked_hash_map::Entry;
+use hashlink::linked_hash_map::Entry;
 use yaml_rust::parser::{Event, MarkedEventReceiver, Parser};
 use yaml_rust::scanner::Marker as YamlMarker;
 use yaml_rust::scanner::ScanError;

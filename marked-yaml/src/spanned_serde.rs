@@ -1081,7 +1081,7 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
 
 // -------------------------------------------------------------------------------
 
-type MappingValueSeq<'de> = linked_hash_map::Iter<'de, MarkedScalarNode, Node>;
+type MappingValueSeq<'de> = hashlink::linked_hash_map::Iter<'de, MarkedScalarNode, Node>;
 struct MappingAccess<'de> {
     items: Peekable<MappingValueSeq<'de>>,
 }

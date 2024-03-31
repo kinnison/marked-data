@@ -2,7 +2,7 @@
 //!
 
 use doc_comment::doc_comment;
-use linked_hash_map::LinkedHashMap;
+use hashlink::LinkedHashMap;
 use std::borrow::{Borrow, Cow};
 use std::convert::TryFrom;
 use std::fmt::{self, Display};
