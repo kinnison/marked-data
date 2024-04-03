@@ -436,7 +436,9 @@ impl fmt::Display for FromNodeError {
 /// Errors which can occur when deserialising from YAML
 #[derive(Debug)]
 pub enum FromYamlError {
+    /// A problem was encountered when parsing YAML
     ParseYaml(crate::LoadError),
+    /// A problem was encountered when deserializing from nodes
     FromNode(FromNodeError),
 }
 
