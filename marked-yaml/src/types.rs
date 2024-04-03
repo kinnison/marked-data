@@ -408,7 +408,7 @@ pub(crate) type MappingHash = LinkedHashMap<MarkedScalarNode, Node>;
 /// unique and always scalars, whereas values may be YAML nodes of any kind.
 ///
 /// Because *some* users of this crate may need to care about insertion order
-/// we use `linked_hash_map` for this.
+/// we use [`hashlink::LinkedHashMap`] for this.
 ///
 /// **NOTE**: Nodes are considered equal even if they don't come from the
 /// same place.  *i.e. their spans are ignored for equality and hashing*
