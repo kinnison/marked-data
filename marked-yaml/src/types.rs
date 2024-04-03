@@ -966,7 +966,7 @@ impl MarkedSequenceNode {
     ///
     /// ```
     /// # use marked_yaml::types::*;
-    /// # use linked_hash_map::LinkedHashMap;
+    /// # use hashlink::LinkedHashMap;
     /// # let map: LinkedHashMap<MarkedScalarNode, Node> = LinkedHashMap::new();
     /// let seq: MarkedSequenceNode = vec![map].into_iter().collect();
     /// assert!(seq.get_mapping(0).is_some());
@@ -1056,7 +1056,7 @@ impl MarkedMappingNode {
     ///
     /// ```
     /// # use marked_yaml::types::*;
-    /// # use linked_hash_map::LinkedHashMap;
+    /// # use hashlink::LinkedHashMap;
     /// let node = MarkedMappingNode::new(Span::new_blank(), LinkedHashMap::new());
     /// ```
     pub fn new(span: Span, value: MappingHash) -> Self {
