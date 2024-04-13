@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use marked_yaml::{from_node, from_yaml, parse_yaml, Spanned};
+use marked_yaml::{from_node, from_yaml, parse_yaml, FromYamlError, Spanned};
 use serde::Deserialize;
 
 const TEST_DOC: &str = r#"# Line one is a comment
@@ -24,6 +24,9 @@ kvs:
     first: one
     second: two
     third: banana
+falsy: false
+truthy: true
+yes: true
 "#;
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +42,9 @@ struct FullTest {
     looksee: EnumCheck,
     known: EnumCheck,
     kvs: HashMap<Spanned<String>, Spanned<String>>,
+    falsy: Spanned<bool>,
+    truthy: Spanned<bool>,
+    yes: Spanned<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -67,10 +73,28 @@ fn read_everything() {
     let nodes = parse_yaml(0, TEST_DOC).unwrap();
     let doc: FullTest = from_node(&nodes).unwrap();
     println!("{doc:?}");
+    assert_eq!(doc.top[0].as_str(), "level");
+    assert!(doc.falsy == false);
+    assert!(doc.truthy == true);
+    assert_ne!(doc.truthy, doc.falsy);
+    assert_eq!(doc.truthy, doc.yes);
 }
 
 #[test]
 fn ergonomics() {
     let doc: FullTest = from_yaml(0, TEST_DOC).unwrap();
     assert_eq!(doc.kvs.get("first").map(|s| s.as_str()), Some("one"));
+}
+
+#[test]
+fn parse_fails() {
+    let err = from_yaml::<FullTest>(0, "hello world").err().unwrap();
+    assert!(matches!(err, FromYamlError::ParseYaml(_)));
+    let err = from_yaml::<FullTest>(0, "hello: world").err().unwrap();
+    assert!(matches!(err, FromYamlError::FromNode(_)));
+    let FromYamlError::FromNode(n) = err else {
+        unreachable!()
+    };
+    let s = format!("{n}");
+    assert!(s.starts_with("missing field"));
 }
