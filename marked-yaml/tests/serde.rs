@@ -4,13 +4,14 @@
 
 use std::collections::HashMap;
 
-use marked_yaml::{from_node, from_yaml, parse_yaml, Spanned};
+use marked_yaml::{from_node, from_yaml, parse_yaml, FromYamlError, Span, Spanned};
 use serde::Deserialize;
 
 const TEST_DOC: &str = r#"# Line one is a comment
 top:
   - level
   - is always
+  - two
   - strings
 u8s: [ 0, 1, 2, 255 ]
 i8s: [ -128, 0, 127 ]
@@ -24,6 +25,9 @@ kvs:
     first: one
     second: two
     third: banana
+falsy: false
+truthy: true
+yes: true
 "#;
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +43,9 @@ struct FullTest {
     looksee: EnumCheck,
     known: EnumCheck,
     kvs: HashMap<Spanned<String>, Spanned<String>>,
+    falsy: Spanned<bool>,
+    truthy: Spanned<bool>,
+    yes: Spanned<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -67,10 +74,48 @@ fn read_everything() {
     let nodes = parse_yaml(0, TEST_DOC).unwrap();
     let doc: FullTest = from_node(&nodes).unwrap();
     println!("{doc:?}");
+    assert_eq!(doc.top[0].as_str(), "level");
+    assert!(doc.falsy == false);
+    assert!(doc.truthy == true);
+    assert_ne!(doc.truthy, doc.falsy);
+    assert_eq!(doc.truthy, doc.yes);
+    assert_eq!(doc.top[2], "two");
+    assert_ne!(doc.top[3], "two");
+    let s = String::from("s");
+    assert!(doc.top[0] != s);
 }
 
 #[test]
 fn ergonomics() {
     let doc: FullTest = from_yaml(0, TEST_DOC).unwrap();
     assert_eq!(doc.kvs.get("first").map(|s| s.as_str()), Some("one"));
+    let k1 = Spanned::new(Span::new_blank(), "k1");
+    let mut map = HashMap::new();
+    map.insert(k1, "v1");
+    let k2 = Spanned::new(Span::new_blank(), "k2");
+    assert!(!map.contains_key(&k2));
+    assert!(map.contains_key("k1"));
+}
+
+#[test]
+fn parse_fails() {
+    let err = from_yaml::<FullTest>(0, "hello world").err().unwrap();
+    assert!(matches!(err, FromYamlError::ParseYaml(_)));
+    let err = from_yaml::<FullTest>(0, "hello: world").err().unwrap();
+    assert!(matches!(err, FromYamlError::FromNode(_)));
+    let s = format!("{err}");
+    assert!(s.starts_with("missing field"));
+    #[derive(Deserialize)]
+    #[allow(dead_code)]
+    struct MiniDoc {
+        colour: Colour,
+    }
+    let err = from_yaml::<MiniDoc>(0, "colour: {Red: optional}")
+        .err()
+        .unwrap();
+    let s = format! {"{err}"};
+    #[cfg(feature = "serde-path")]
+    assert_eq!(s, "colour.Red: invalid type: map, expected String");
+    #[cfg(not(feature = "serde-path"))]
+    assert_eq!(s, "invalid type: map, expected String");
 }

@@ -72,9 +72,9 @@ where
     }
 }
 
-impl PartialEq<str> for Spanned<String> {
-    fn eq(&self, other: &str) -> bool {
-        self.inner == other
+impl PartialEq<&str> for Spanned<String> {
+    fn eq(&self, other: &&str) -> bool {
+        self.inner == *other
     }
 }
 
@@ -140,8 +140,8 @@ where
         {
             type Value = Spanned<T>;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a MarkedNode of some kind")
+            fn expecting(&self, _formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                unreachable!()
             }
 
             fn visit_map<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
@@ -219,6 +219,36 @@ where
         S: serde::Serializer,
     {
         self.inner.serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+mod spanned_tests {
+    use super::Spanned;
+    use serde::{forward_to_deserialize_any, Deserialize, Deserializer};
+
+    #[test]
+    #[should_panic]
+    fn spanned_always_map() {
+        struct NotSpanned;
+        impl<'de> Deserializer<'de> for NotSpanned {
+            type Error = super::Error;
+
+            fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+            where
+                V: serde::de::Visitor<'de>,
+            {
+                visitor.visit_bool(false)
+            }
+
+            forward_to_deserialize_any! [
+                bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
+                unit unit_struct newtype_struct seq tuple tuple_struct
+                map identifier ignored_any option struct enum
+            ];
+        }
+        type T = Spanned<bool>;
+        let _ = T::deserialize(NotSpanned);
     }
 }
 
@@ -559,9 +589,6 @@ where
     T: Deserialize<'de>,
 {
     #[cfg(not(feature = "serde-path"))]
-    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
-    where
-        T: Deserialize<'de>,
     {
         T::deserialize(NodeDeserializer::new(node)).map_err(|e| FromNodeError {
             error: e,
@@ -570,9 +597,6 @@ where
     }
 
     #[cfg(feature = "serde-path")]
-    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
-    where
-        T: Deserialize<'de>,
     {
         use serde_path_to_error::Segment;
 
@@ -634,25 +658,20 @@ where
                     }
                 }
                 e.set_span(best_span);
-                FromNodeError {
-                    error: e,
-                    path: Some(path),
-                }
+                FromNodeError { error: e, path }
             } else {
                 let path = render_path(e.path());
                 FromNodeError {
                     error: e.into_inner(),
-                    path: Some(path),
+                    path,
                 }
             }
         })
     }
-
-    inner_from_node(node)
 }
 
 #[cfg(feature = "serde-path")]
-fn render_path(path: &serde_path_to_error::Path) -> String {
+fn render_path(path: &serde_path_to_error::Path) -> Option<String> {
     use serde_path_to_error::Segment::*;
     use std::fmt::Write;
     let mut ret = String::new();
@@ -670,7 +689,11 @@ fn render_path(path: &serde_path_to_error::Path) -> String {
         }
         separator = ".";
     }
-    ret
+    if ret.is_empty() {
+        None
+    } else {
+        Some(ret)
+    }
 }
 
 // -------------------------------------------------------------------------------
@@ -909,70 +932,6 @@ where
 
 // -------------------------------------------------------------------------------
 
-struct UnitVariantAccess;
-
-impl<'de> VariantAccess<'de> for UnitVariantAccess {
-    type Error = Error;
-
-    fn unit_variant(self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn newtype_variant_seed<T>(self, _seed: T) -> Result<T::Value, Self::Error>
-    where
-        T: serde::de::DeserializeSeed<'de>,
-    {
-        Err(serde::de::Error::invalid_type(
-            Unexpected::UnitVariant,
-            &"newtype variant",
-        ))
-    }
-
-    fn tuple_variant<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        Err(serde::de::Error::invalid_type(
-            Unexpected::UnitVariant,
-            &"tuple variant",
-        ))
-    }
-
-    fn struct_variant<V>(
-        self,
-        _fields: &'static [&'static str],
-        _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        Err(serde::de::Error::invalid_type(
-            Unexpected::UnitVariant,
-            &"struct variant",
-        ))
-    }
-}
-
-struct MarkedScalarNodeEnumAccess<'de> {
-    node: &'de MarkedScalarNode,
-}
-
-impl<'de> EnumAccess<'de> for MarkedScalarNodeEnumAccess<'de> {
-    type Error = Error;
-
-    type Variant = UnitVariantAccess;
-
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-    where
-        V: serde::de::DeserializeSeed<'de>,
-    {
-        seed.deserialize(self.node.into_deserializer())
-            .map(|v| (v, UnitVariantAccess))
-    }
-}
-
-// -------------------------------------------------------------------------------
-
 impl<'de> IntoDeserializer<'de, Error> for &'de MarkedScalarNode {
     type Deserializer = MarkedScalarNodeDeserializer<'de>;
     fn into_deserializer(self) -> MarkedScalarNodeDeserializer<'de> {
@@ -1071,7 +1030,7 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_enum(MarkedScalarNodeEnumAccess { node: self.node })
+        visitor.visit_enum(self.node.as_str().into_deserializer())
     }
 
     forward_to_deserialize_any! [
