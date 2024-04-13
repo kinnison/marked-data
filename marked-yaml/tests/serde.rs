@@ -4,13 +4,14 @@
 
 use std::collections::HashMap;
 
-use marked_yaml::{from_node, from_yaml, parse_yaml, FromYamlError, Spanned};
+use marked_yaml::{from_node, from_yaml, parse_yaml, FromYamlError, Span, Spanned};
 use serde::Deserialize;
 
 const TEST_DOC: &str = r#"# Line one is a comment
 top:
   - level
   - is always
+  - two
   - strings
 u8s: [ 0, 1, 2, 255 ]
 i8s: [ -128, 0, 127 ]
@@ -78,12 +79,22 @@ fn read_everything() {
     assert!(doc.truthy == true);
     assert_ne!(doc.truthy, doc.falsy);
     assert_eq!(doc.truthy, doc.yes);
+    assert_eq!(doc.top[2], "two");
+    assert_ne!(doc.top[3], "two");
+    let s = String::from("s");
+    assert!(doc.top[0] != s);
 }
 
 #[test]
 fn ergonomics() {
     let doc: FullTest = from_yaml(0, TEST_DOC).unwrap();
     assert_eq!(doc.kvs.get("first").map(|s| s.as_str()), Some("one"));
+    let k1 = Spanned::new(Span::new_blank(), "k1");
+    let mut map = HashMap::new();
+    map.insert(k1, "v1");
+    let k2 = Spanned::new(Span::new_blank(), "k2");
+    assert!(!map.contains_key(&k2));
+    assert!(map.contains_key("k1"));
 }
 
 #[test]
@@ -92,9 +103,6 @@ fn parse_fails() {
     assert!(matches!(err, FromYamlError::ParseYaml(_)));
     let err = from_yaml::<FullTest>(0, "hello: world").err().unwrap();
     assert!(matches!(err, FromYamlError::FromNode(_)));
-    let FromYamlError::FromNode(n) = err else {
-        unreachable!()
-    };
-    let s = format!("{n}");
+    let s = format!("{err}");
     assert!(s.starts_with("missing field"));
 }
