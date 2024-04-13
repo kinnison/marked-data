@@ -902,70 +902,6 @@ where
 
 // -------------------------------------------------------------------------------
 
-struct UnitVariantAccess;
-
-impl<'de> VariantAccess<'de> for UnitVariantAccess {
-    type Error = Error;
-
-    fn unit_variant(self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn newtype_variant_seed<T>(self, _seed: T) -> Result<T::Value, Self::Error>
-    where
-        T: serde::de::DeserializeSeed<'de>,
-    {
-        Err(serde::de::Error::invalid_type(
-            Unexpected::UnitVariant,
-            &"newtype variant",
-        ))
-    }
-
-    fn tuple_variant<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        Err(serde::de::Error::invalid_type(
-            Unexpected::UnitVariant,
-            &"tuple variant",
-        ))
-    }
-
-    fn struct_variant<V>(
-        self,
-        _fields: &'static [&'static str],
-        _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        Err(serde::de::Error::invalid_type(
-            Unexpected::UnitVariant,
-            &"struct variant",
-        ))
-    }
-}
-
-struct MarkedScalarNodeEnumAccess<'de> {
-    node: &'de MarkedScalarNode,
-}
-
-impl<'de> EnumAccess<'de> for MarkedScalarNodeEnumAccess<'de> {
-    type Error = Error;
-
-    type Variant = UnitVariantAccess;
-
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-    where
-        V: serde::de::DeserializeSeed<'de>,
-    {
-        seed.deserialize(self.node.into_deserializer())
-            .map(|v| (v, UnitVariantAccess))
-    }
-}
-
-// -------------------------------------------------------------------------------
-
 impl<'de> IntoDeserializer<'de, Error> for &'de MarkedScalarNode {
     type Deserializer = MarkedScalarNodeDeserializer<'de>;
     fn into_deserializer(self) -> MarkedScalarNodeDeserializer<'de> {
@@ -1064,7 +1000,7 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_enum(MarkedScalarNodeEnumAccess { node: self.node })
+        visitor.visit_enum(self.node.as_str().into_deserializer())
     }
 
     forward_to_deserialize_any! [
