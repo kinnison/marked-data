@@ -1,11 +1,11 @@
 //! Marked YAML
 //! ===========
 //!
-//! Currently this library only supports loading YAML from strings,
+//! Currently this library only supports parsing YAML from strings,
 //! but this is sufficient for most users' purposes.  We would not
 //! recommend an un-streamed processing engine for massive data anyway.
 //!
-//! To load some YAML you simply need to:
+//! To parse some YAML you simply need to:
 //!
 //! ```
 //! let node = marked_yaml::parse_yaml(0, r#"
@@ -21,7 +21,7 @@
 //! assert!(node.is_ok());
 //! ```
 //!
-//! Parsing a valid YAML file may fail because `marked_yaml` adds some
+//! Parsing a valid YAML string may fail because `marked_yaml` adds some
 //! additional constraints:
 //!
 //! * The top level of the YAML **MUST** be a mapping.
@@ -30,7 +30,29 @@
 //!
 //! In addition, you can convert between `marked_yaml::Node` and `yaml_rust::Yaml`
 //! though doing so will not give you any useful markers.
+#![cfg_attr(
+    feature = "serde",
+    doc = r#"
 
+Should you so choose, you may use serde to deserialise YAML
+strings directly into structures, any amount of which could be annotated
+with the [`Spanned`] type to capture information about where the value came
+from in the input.
+
+```
+# use marked_yaml::{from_yaml, Marker, Spanned};
+# use std::collections::HashMap;
+let YAML = "Daniel: Author\nUser: Not Author\n";
+let roles: HashMap<Spanned<String>, Spanned<String>> = from_yaml(0, YAML).unwrap();
+
+assert_eq!(roles["Daniel"], "Author");
+assert_eq!(roles["User"].span().start().copied(), Some(Marker::new(0, 2, 7)));
+```
+
+You do not have to have all values [`Spanned`], and you can deserialize from an already
+parsed set of nodes with [`from_node`] instead.
+"#
+)]
 #![deny(missing_docs)]
 
 pub mod loader;

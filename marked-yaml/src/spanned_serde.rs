@@ -25,7 +25,20 @@ use crate::{
 
 /// Wrapper which can be used when deserialising data from [`Node`]
 ///
-/// You must use a compatible deserializer if you want to deserialize these values,
+/// You must use a compatible deserializer if you want to deserialize these values.
+///
+/// ```
+/// use marked_yaml::{from_yaml, Spanned};
+/// use serde::Deserialize;
+///
+/// #[derive(Deserialize)]
+/// struct MyStuff {
+///     num: Spanned<u32>,
+/// }
+/// let stuff: MyStuff = from_yaml(0, "num: 12").unwrap();
+/// ```
+///
+/// You can also serialize these values,
 /// however when serializing you will lose the span information so do not expect
 /// to round-trip these values.
 #[derive(Debug)]
@@ -36,11 +49,23 @@ pub struct Spanned<T> {
 
 impl<T> Spanned<T> {
     /// Wrap an instance of something with the given span
+    ///
+    /// ```
+    /// # use marked_yaml::{Spanned, Span};
+    /// let spanned = Spanned::new(Span::new_blank(), "Hello World");
+    /// ```
     pub fn new(span: Span, inner: T) -> Self {
         Self { span, inner }
     }
 
     /// The span associated with this value
+    ///
+    /// ```
+    /// # use marked_yaml::{Spanned, Span, Marker};
+    /// # let span = Span::new_start(Marker::new(0,1,2));
+    /// let spanned = Spanned::new(span, "Hello World");
+    /// assert_eq!(spanned.span(), &span);
+    /// ```
     pub fn span(&self) -> &Span {
         &self.span
     }
