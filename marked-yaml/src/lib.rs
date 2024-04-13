@@ -68,6 +68,7 @@ pub use types::{Marker, Node, Span};
 pub mod spanned_serde;
 
 #[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[doc(inline)]
 pub use spanned_serde::{
     from_node, from_yaml, from_yaml_with_options, Error, FromNodeError, FromYamlError, Spanned,

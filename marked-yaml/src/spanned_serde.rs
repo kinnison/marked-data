@@ -457,7 +457,12 @@ pub struct FromNodeError {
 }
 
 impl FromNodeError {
-    /// The logical path representing where the error occurred
+    #[cfg_attr(docsrs, doc(cfg(feature = "serde-path")))]
+    /// The logical path representing where the error occurred.
+    ///
+    /// Note: this likely will only ever be `Some(value)` if
+    /// you enable the `serde-path` feature, though the function
+    /// itself will be available with the `serde` feature.
     pub fn path(&self) -> Option<&str> {
         self.path.as_deref()
     }
