@@ -105,4 +105,17 @@ fn parse_fails() {
     assert!(matches!(err, FromYamlError::FromNode(_)));
     let s = format!("{err}");
     assert!(s.starts_with("missing field"));
+    #[derive(Deserialize)]
+    #[allow(dead_code)]
+    struct MiniDoc {
+        colour: Colour,
+    }
+    let err = from_yaml::<MiniDoc>(0, "colour: {Red: optional}")
+        .err()
+        .unwrap();
+    let s = format! {"{err}"};
+    #[cfg(feature = "serde-path")]
+    assert_eq!(s, "colour.Red: invalid type: map, expected String");
+    #[cfg(not(feature = "serde-path"))]
+    assert_eq!(s, "invalid type: map, expected String");
 }
