@@ -72,9 +72,9 @@ where
     }
 }
 
-impl PartialEq<str> for Spanned<String> {
-    fn eq(&self, other: &str) -> bool {
-        self.inner == other
+impl PartialEq<&str> for Spanned<String> {
+    fn eq(&self, other: &&str) -> bool {
+        self.inner == *other
     }
 }
 
