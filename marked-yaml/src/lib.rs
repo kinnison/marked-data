@@ -54,6 +54,7 @@ parsed set of nodes with [`from_node`] instead.
 "#
 )]
 #![deny(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod loader;
 pub mod types;
