@@ -1,6 +1,6 @@
 [package]
 name = "marked-yaml"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Daniel Silverstone <dsilvers@digital-scurf.org>"]
 edition = "2021"
 description = "A simplified YAML structure with provenance spans"
