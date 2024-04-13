@@ -559,9 +559,6 @@ where
     T: Deserialize<'de>,
 {
     #[cfg(not(feature = "serde-path"))]
-    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
-    where
-        T: Deserialize<'de>,
     {
         T::deserialize(NodeDeserializer::new(node)).map_err(|e| FromNodeError {
             error: e,
@@ -570,9 +567,6 @@ where
     }
 
     #[cfg(feature = "serde-path")]
-    fn inner_from_node<'de, T>(node: &'de Node) -> Result<T, FromNodeError>
-    where
-        T: Deserialize<'de>,
     {
         use serde_path_to_error::Segment;
 
@@ -644,8 +638,6 @@ where
             }
         })
     }
-
-    inner_from_node(node)
 }
 
 #[cfg(feature = "serde-path")]
