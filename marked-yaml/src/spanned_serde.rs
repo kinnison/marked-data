@@ -634,15 +634,12 @@ where
                     }
                 }
                 e.set_span(best_span);
-                FromNodeError {
-                    error: e,
-                    path: Some(path),
-                }
+                FromNodeError { error: e, path }
             } else {
                 let path = render_path(e.path());
                 FromNodeError {
                     error: e.into_inner(),
-                    path: Some(path),
+                    path,
                 }
             }
         })
@@ -652,7 +649,7 @@ where
 }
 
 #[cfg(feature = "serde-path")]
-fn render_path(path: &serde_path_to_error::Path) -> String {
+fn render_path(path: &serde_path_to_error::Path) -> Option<String> {
     use serde_path_to_error::Segment::*;
     use std::fmt::Write;
     let mut ret = String::new();
@@ -670,7 +667,11 @@ fn render_path(path: &serde_path_to_error::Path) -> String {
         }
         separator = ".";
     }
-    ret
+    if ret.is_empty() {
+        None
+    } else {
+        Some(ret)
+    }
 }
 
 // -------------------------------------------------------------------------------
