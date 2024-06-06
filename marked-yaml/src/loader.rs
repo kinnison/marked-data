@@ -40,11 +40,26 @@ pub enum LoadError {
 }
 
 /// Options for loading YAML
+///
+/// Default options ([`LoaderOptions::default()`]) are:
+///
+/// - Permit duplicate keys
+///
 #[derive(Debug, Default)]
 pub struct LoaderOptions {
-    /// If true, duplicate keys in mappings will cause an error. If false,
-    /// the last key will be used.
-    pub error_on_duplicate_keys: bool,
+    error_on_duplicate_keys: bool,
+}
+
+impl LoaderOptions {
+    /// Enable errors on duplicate keys
+    ///
+    /// If enabled, duplicate keys in mappings will cause an error.
+    /// If disabled, the last key/value pair will be used.
+    pub fn error_on_duplicate_keys(self, enable: bool) -> Self {
+        Self {
+            error_on_duplicate_keys: enable,
+        }
+    }
 }
 
 impl Display for LoadError {
