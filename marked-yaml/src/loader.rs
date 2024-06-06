@@ -5,8 +5,8 @@ use crate::types::*;
 
 use hashlink::linked_hash_map::Entry;
 use yaml_rust::parser::{Event, MarkedEventReceiver, Parser};
-use yaml_rust::scanner::Marker as YamlMarker;
 use yaml_rust::scanner::ScanError;
+use yaml_rust::scanner::{Marker as YamlMarker, TScalarStyle};
 
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -48,6 +48,7 @@ pub enum LoadError {
 #[derive(Debug, Default)]
 pub struct LoaderOptions {
     error_on_duplicate_keys: bool,
+    prevent_coercion: bool,
 }
 
 impl LoaderOptions {
@@ -58,6 +59,18 @@ impl LoaderOptions {
     pub fn error_on_duplicate_keys(self, enable: bool) -> Self {
         Self {
             error_on_duplicate_keys: enable,
+            ..self
+        }
+    }
+
+    /// Prevent coercion of scalar nodes
+    ///
+    /// If you want to disable things like [`.as_bool()`](crate::types::MarkedScalarNode::as_bool())
+    /// then you can call this and set coercion to be prevented.
+    pub fn prevent_coercion(self, prevent: bool) -> Self {
+        Self {
+            prevent_coercion: prevent,
+            ..self
         }
     }
 }
@@ -270,13 +283,16 @@ impl MarkedEventReceiver for MarkedLoader {
                 Finished(_) => curstate,
                 _ => unreachable!(),
             },
-            Event::Scalar(val, _kind, aid, tag) => {
+            Event::Scalar(val, kind, aid, tag) => {
                 if aid == 0 {
                     if tag.is_some() {
                         Error(LoadError::UnexpectedTag(mark))
                     } else {
                         let span = Span::new_start(mark);
-                        let node = MarkedScalarNode::new(span, val);
+                        let mut node = MarkedScalarNode::new(span, val);
+                        if self.options.prevent_coercion {
+                            node.set_coerce(dbg!(matches!(kind, TScalarStyle::Plain)));
+                        }
                         match curstate {
                             MappingWaitingOnKey(mark, map) => {
                                 MappingWaitingOnValue(mark, map, node)
@@ -364,9 +380,8 @@ pub fn parse_yaml<S>(source: usize, yaml: S) -> Result<Node, LoadError>
 where
     S: AsRef<str>,
 {
-    let options = LoaderOptions {
-        error_on_duplicate_keys: false,
-    };
+    let options = LoaderOptions::default();
+
     parse_yaml_with_options(source, yaml, options)
 }
 
@@ -412,6 +427,26 @@ mod test {
     }
 
     #[test]
+    fn prevent_coercion() {
+        let node = parse_yaml_with_options(
+            0,
+            include_str!("../examples/everything.yaml"),
+            LoaderOptions::default().prevent_coercion(true),
+        )
+        .unwrap();
+        let map = node.as_mapping().unwrap();
+        assert_eq!(map.get_scalar("simple").unwrap().as_str(), "scalar");
+        assert_eq!(map.get_scalar("boolean1").unwrap().as_str(), "true");
+        assert_eq!(map.get_scalar("boolean1").unwrap().as_bool(), None);
+        assert_eq!(map.get_scalar("boolean2").unwrap().as_str(), "false");
+        assert_eq!(map.get_scalar("boolean2").unwrap().as_bool(), Some(false));
+        assert_eq!(map.get_scalar("integer").unwrap().as_str(), "1234");
+        assert_eq!(map.get_scalar("integer").unwrap().as_i32(), None);
+        assert_eq!(map.get_scalar("float").unwrap().as_str(), "12.34");
+        assert_eq!(map.get_scalar("float").unwrap().as_f32(), Some(12.34));
+    }
+
+    #[test]
     fn toplevel_is_empty() {
         let node = parse_yaml(0, "").unwrap();
         let map = node.as_mapping().unwrap();
@@ -448,9 +483,7 @@ mod test {
         let err = parse_yaml_with_options(
             0,
             "{foo: bar, foo: baz}",
-            LoaderOptions {
-                error_on_duplicate_keys: true,
-            },
+            LoaderOptions::default().error_on_duplicate_keys(true),
         );
 
         assert_eq!(
