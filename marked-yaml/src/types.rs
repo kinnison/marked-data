@@ -826,6 +826,10 @@ impl From<bool> for MarkedScalarNode {
 
 macro_rules! scalar_from_to_number {
     ($t:ident, $as:ident) => {
+        scalar_from_to_number!($t, $as, 0);
+    };
+
+    ($t:ident, $as:ident, $zero:expr) => {
         impl From<$t> for MarkedScalarNode {
             doc_comment!(
                 concat!(
@@ -837,7 +841,9 @@ macro_rules! scalar_from_to_number {
 # use marked_yaml::types::*;
 let value: "#,
                     stringify!($t),
-                    r#" = 0;
+                    " = ",
+                    stringify!($zero),
+                    r#";
 let node: MarkedScalarNode = value.into();
 assert_eq!(&*node, "0");
 ```"#
@@ -901,6 +907,8 @@ scalar_from_to_number!(u32, as_u32);
 scalar_from_to_number!(u64, as_u64);
 scalar_from_to_number!(u128, as_u128);
 scalar_from_to_number!(usize, as_usize);
+scalar_from_to_number!(f32, as_f32, 0.0);
+scalar_from_to_number!(f64, as_f64, 0.0);
 
 impl Deref for MarkedScalarNode {
     type Target = str;
