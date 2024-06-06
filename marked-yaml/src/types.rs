@@ -398,6 +398,7 @@ pub enum Node {
 pub struct MarkedScalarNode {
     span: Span,
     value: String,
+    may_coerce: bool,
 }
 
 pub(crate) type MappingHash = LinkedHashMap<MarkedScalarNode, Node>;
@@ -690,6 +691,7 @@ impl MarkedScalarNode {
         Self {
             span,
             value: String::new(),
+            may_coerce: true,
         }
     }
 
@@ -703,6 +705,7 @@ impl MarkedScalarNode {
         Self {
             span,
             value: content.into().into_owned(),
+            may_coerce: true,
         }
     }
 
@@ -717,6 +720,23 @@ impl MarkedScalarNode {
     /// ```
     pub fn as_str(&self) -> &str {
         self.value.as_str()
+    }
+
+    /// Enable or disable permission to coerce values
+    ///
+    /// The various [`as_bool()`][Self::as_bool()] and other methods
+    /// which can coerce a string can be forced to always deny
+    /// coercion.
+    ///
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let mut node: MarkedScalarNode = "true".into();
+    /// assert_eq!(node.as_bool(), Some(true));
+    /// node.set_coerce(false);
+    /// assert_eq!(node.as_bool(), None);
+    /// ```
+    pub fn set_coerce(&mut self, may_coerce: bool) {
+        self.may_coerce = may_coerce;
     }
 
     /// Treat the scalar node as a boolean
@@ -735,6 +755,9 @@ impl MarkedScalarNode {
     ///
     /// Everything else is not a boolean and so will return None
     ///
+    /// Note: If you have done [`.set_coerce(false)`](MarkedScalarNode::set_coerce())
+    /// then no matter the string's value, this will return `None`.
+    ///
     /// ```
     /// # use marked_yaml::types::*;
     /// let node: MarkedScalarNode = "true".into();
@@ -743,12 +766,19 @@ impl MarkedScalarNode {
     /// assert_eq!(node.as_bool(), Some(false));
     /// let node: MarkedScalarNode = "NO".into(); // YAML boolean, but not for us
     /// assert_eq!(node.as_bool(), None);
+    /// let mut node: MarkedScalarNode = "true".into();
+    /// node.set_coerce(false);
+    /// assert_eq!(node.as_bool(), None);
     /// ```
     pub fn as_bool(&self) -> Option<bool> {
-        match self.value.as_str() {
-            "true" | "True" | "TRUE" => Some(true),
-            "false" | "False" | "FALSE" => Some(false),
-            _ => None,
+        if self.may_coerce {
+            match self.value.as_str() {
+                "true" | "True" | "TRUE" => Some(true),
+                "false" | "False" | "FALSE" => Some(false),
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 }
@@ -830,19 +860,29 @@ a number of the right kind then return it.  This is essentially
 a shortcut for using the `FromStr` trait on the return value of
 `.as_str()`.
 
+Note, this honours the setting of [`MarkedScalarNode::set_coerce()`]
+
 ```
 # use marked_yaml::types::*;
-let node: MarkedScalarNode = "0".into();
+let mut node: MarkedScalarNode = "0".into();
 assert_eq!(node.as_"#,
                     stringify!($t),
                     r#"(), Some(0"#,
                     stringify!($t),
                     r#"));
+node.set_coerce(false);
+assert_eq!(node.as_"#,
+                    stringify!($t),
+                    r#"(), None);
 ```"#
                 ),
                 pub fn $as(&self) -> Option<$t> {
-                    use std::str::FromStr;
-                    $t::from_str(&self.value).ok()
+                    if self.may_coerce {
+                        use std::str::FromStr;
+                        $t::from_str(&self.value).ok()
+                    } else {
+                        None
+                    }
                 }
             );
         }
