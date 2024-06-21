@@ -292,7 +292,7 @@ pub enum Error {
     /// An unknown field was encountered
     UnknownFieldError(String, &'static [&'static str], Span),
     /// Some other error occurred
-    Other(Box<dyn std::error::Error>, Span),
+    Other(String, Span),
 }
 
 impl Error {
@@ -383,7 +383,7 @@ impl serde::de::Error for Error {
     where
         T: fmt::Display,
     {
-        Error::Other(msg.to_string().into(), Span::new_blank())
+        Error::Other(msg.to_string(), Span::new_blank())
     }
 
     fn unknown_field(field: &str, expected: &'static [&'static str]) -> Self {
@@ -452,7 +452,7 @@ impl<'node> NodeDeserializer<'node> {
 /// Finally you may extract the error itself.
 #[derive(Debug)]
 pub struct FromNodeError {
-    error: Error,
+    error: Box<Error>,
     path: Option<String>,
 }
 
@@ -469,7 +469,7 @@ impl FromNodeError {
 
     /// Extract the inner error
     pub fn into_inner(self) -> Error {
-        self.error
+        *self.error
     }
 }
 
@@ -688,11 +688,14 @@ where
                     }
                 }
                 e.set_span(best_span);
-                FromNodeError { error: e, path }
+                FromNodeError {
+                    error: Box::new(e),
+                    path,
+                }
             } else {
                 let path = render_path(e.path());
                 FromNodeError {
-                    error: e.into_inner(),
+                    error: Box::new(e.into_inner()),
                     path,
                 }
             }
