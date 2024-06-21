@@ -995,8 +995,12 @@ macro_rules! scalar_fromstr {
         where
             V: Visitor<'de>,
         {
-            let value: $ty = self.node.as_str().parse().addspans(*self.node.span())?;
-            visitor.$visit(value)
+            if self.node.may_coerce() {
+                let value: $ty = self.node.as_str().parse().addspans(*self.node.span())?;
+                visitor.$visit(value)
+            } else {
+                visitor.visit_str(self.node.deref())
+            }
         }
     };
 }
