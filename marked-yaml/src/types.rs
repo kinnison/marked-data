@@ -728,6 +728,13 @@ impl MarkedScalarNode {
     /// which can coerce a string can be forced to always deny
     /// coercion.
     ///
+    #[cfg_attr(
+        feature = "serde",
+        doc = r#"
+Note: this also applies for deserializing nodes via serde.
+
+"#
+    )]
     /// ```
     /// # use marked_yaml::types::*;
     /// let mut node: MarkedScalarNode = "true".into();
@@ -737,6 +744,31 @@ impl MarkedScalarNode {
     /// ```
     pub fn set_coerce(&mut self, may_coerce: bool) {
         self.may_coerce = may_coerce;
+    }
+
+    /// Retrieve whether or not this node is set to be coerceable
+    ///
+    /// The various [`as_bool()`][Self::as_bool()] and other methods
+    /// which can coerce a string can be forced to deny coercion.
+    ///
+    #[cfg_attr(
+        feature = "serde",
+        doc = r#"
+Note: this also applies for deserializing nodes via serde.
+
+"#
+    )]
+    /// ```
+    /// # use marked_yaml::types::*;
+    /// let mut node: MarkedScalarNode = "true".into();
+    /// assert_eq!(node.as_bool(), Some(true));
+    /// assert_eq!(node.may_coerce(), true);
+    /// node.set_coerce(false);
+    /// assert_eq!(node.as_bool(), None);
+    /// assert_eq!(node.may_coerce(), false);
+    /// ```
+    pub fn may_coerce(&self) -> bool {
+        self.may_coerce
     }
 
     /// Treat the scalar node as a boolean
