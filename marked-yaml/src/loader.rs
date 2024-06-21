@@ -52,6 +52,7 @@ pub struct LoaderOptions {
     error_on_duplicate_keys: bool,
     prevent_coercion: bool,
     toplevel_is_mapping: bool,
+    lowercase_keys: bool,
 }
 
 impl Default for LoaderOptions {
@@ -60,6 +61,7 @@ impl Default for LoaderOptions {
             error_on_duplicate_keys: false,
             prevent_coercion: false,
             toplevel_is_mapping: true,
+            lowercase_keys: false,
         }
     }
 }
@@ -103,6 +105,17 @@ impl LoaderOptions {
     pub fn toplevel_sequence(self) -> Self {
         Self {
             toplevel_is_mapping: false,
+            ..self
+        }
+    }
+
+    /// Whether or not to force-lowercase mapping keys when loading
+    ///
+    /// By default, the loader will leave key names alone, but in some
+    /// cases it can be preferable to normalise them to lowercase
+    pub fn lowercase_keys(self, force_lowercase: bool) -> Self {
+        Self {
+            lowercase_keys: force_lowercase,
             ..self
         }
     }
@@ -335,6 +348,13 @@ impl MarkedEventReceiver for MarkedLoader {
                         Error(LoadError::UnexpectedTag(mark))
                     } else {
                         let span = Span::new_start(mark);
+                        let val = if matches!(curstate, MappingWaitingOnKey(_, _))
+                            && self.options.lowercase_keys
+                        {
+                            val.to_lowercase()
+                        } else {
+                            val
+                        };
                         let mut node = MarkedScalarNode::new(span, val);
                         if self.options.prevent_coercion {
                             node.set_coerce(matches!(kind, TScalarStyle::Plain));
@@ -635,5 +655,26 @@ mod test {
             parse_yaml_with_options(0, "{}", LoaderOptions::default().toplevel_sequence()),
             Err(LoadError::TopLevelMustBeSequence(Marker::new(0, 1, 1)))
         );
+    }
+
+    #[test]
+    fn lowercase_keys() {
+        let node = parse_yaml_with_options(
+            0,
+            "KEY: VALUE",
+            LoaderOptions::default().lowercase_keys(false),
+        )
+        .unwrap();
+        assert!(node.as_mapping().unwrap().contains_key("KEY"));
+        assert!(!node.as_mapping().unwrap().contains_key("key"));
+
+        let node = parse_yaml_with_options(
+            0,
+            "KEY: VALUE",
+            LoaderOptions::default().lowercase_keys(true),
+        )
+        .unwrap();
+        assert!(!node.as_mapping().unwrap().contains_key("KEY"));
+        assert!(node.as_mapping().unwrap().contains_key("key"));
     }
 }
