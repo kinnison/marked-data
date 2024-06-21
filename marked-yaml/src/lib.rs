@@ -24,7 +24,7 @@
 //! Parsing a valid YAML string may fail because `marked_yaml` adds some
 //! additional constraints:
 //!
-//! * The top level of the YAML **MUST** be a mapping.
+//! * The top level of the YAML **MUST** be a mapping or a sequence.
 //! * Mapping keys **MUST** be scalars (strings).
 //! * Aliases and anchors **MAY NOT** be used (though this limit may be lifted in the future).
 //!

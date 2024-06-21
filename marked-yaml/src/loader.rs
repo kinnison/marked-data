@@ -27,6 +27,8 @@ pub struct DuplicateKeyInner {
 pub enum LoadError {
     /// Something other than a mapping detected at the top level
     TopLevelMustBeMapping(Marker),
+    /// Something other than a sequence detected at the top level
+    TopLevelMustBeSequence(Marker),
     /// Unexpected definition of anchor
     UnexpectedAnchor(Marker),
     /// Mapping keys must be scalars
@@ -45,10 +47,21 @@ pub enum LoadError {
 ///
 /// - Permit duplicate keys
 ///
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LoaderOptions {
     error_on_duplicate_keys: bool,
     prevent_coercion: bool,
+    toplevel_is_mapping: bool,
+}
+
+impl Default for LoaderOptions {
+    fn default() -> Self {
+        Self {
+            error_on_duplicate_keys: false,
+            prevent_coercion: false,
+            toplevel_is_mapping: true,
+        }
+    }
 }
 
 impl LoaderOptions {
@@ -73,6 +86,26 @@ impl LoaderOptions {
             ..self
         }
     }
+
+    /// Require that the top level is a mapping node
+    ///
+    /// This is the default, but you can call this to be explicit.
+    pub fn toplevel_mapping(self) -> Self {
+        Self {
+            toplevel_is_mapping: true,
+            ..self
+        }
+    }
+
+    /// Require that the top level is a sequence node
+    ///
+    /// Without calling this, the top level of the YAML is must be a mapping node
+    pub fn toplevel_sequence(self) -> Self {
+        Self {
+            toplevel_is_mapping: false,
+            ..self
+        }
+    }
 }
 
 impl Display for LoadError {
@@ -81,6 +114,7 @@ impl Display for LoadError {
         #[allow(deprecated)]
         match self {
             TopLevelMustBeMapping(m) => write!(f, "{}: Top level must be a mapping", m),
+            TopLevelMustBeSequence(m) => write!(f, "{}: Top level must be a sequence", m),
             UnexpectedAnchor(m) => write!(f, "{}: Unexpected definition of anchor", m),
             MappingKeyMustBeScalar(m) => write!(f, "{}: Keys in mappings must be scalar", m),
             UnexpectedTag(m) => write!(f, "{}: Unexpected use of YAML tag", m),
@@ -163,7 +197,13 @@ impl MarkedEventReceiver for MarkedLoader {
                     Error(LoadError::UnexpectedTag(mark))
                 } else if aid == 0 {
                     match curstate {
-                        StartDocument => MappingWaitingOnKey(mark, MappingHash::new()),
+                        StartDocument => {
+                            if self.options.toplevel_is_mapping {
+                                MappingWaitingOnKey(mark, MappingHash::new())
+                            } else {
+                                Error(LoadError::TopLevelMustBeSequence(mark))
+                            }
+                        }
                         MappingWaitingOnKey(_, _) => Error(LoadError::MappingKeyMustBeScalar(mark)),
                         MappingWaitingOnValue(_, _, _) => {
                             self.state_stack.push(curstate);
@@ -220,7 +260,13 @@ impl MarkedEventReceiver for MarkedLoader {
                     Error(LoadError::UnexpectedTag(mark))
                 } else if aid == 0 {
                     match curstate {
-                        StartDocument => Error(LoadError::TopLevelMustBeMapping(mark)),
+                        StartDocument => {
+                            if self.options.toplevel_is_mapping {
+                                Error(LoadError::TopLevelMustBeMapping(mark))
+                            } else {
+                                SequenceWaitingOnValue(mark, Vec::new())
+                            }
+                        }
                         MappingWaitingOnKey(_, _) => Error(LoadError::MappingKeyMustBeScalar(mark)),
                         mv @ MappingWaitingOnValue(_, _, _) => {
                             self.state_stack.push(mv);
@@ -267,7 +313,7 @@ impl MarkedEventReceiver for MarkedLoader {
                             _ => unreachable!(),
                         }
                     } else {
-                        unreachable!()
+                        Finished(node)
                     }
                 }
                 _ => unreachable!(),
@@ -364,10 +410,13 @@ impl MarkedLoader {
 /// you can determine which source it came from without needing complex
 /// lifetimes to bind strings or other non-copy data to nodes.
 ///
-/// This library requires that the top level be a mapping, but the returned
+/// This function requires that the top level be a mapping, but the returned
 /// type here is the generic Node enumeration to make it potentially easier
 /// for callers to use.  Regardless, it's always possible to treat the
 /// returned node as a mapping node without risk of panic.
+///
+/// If you wish to load a sequence instead of a mapping, then you will
+/// need to use [`parse_yaml_with_options`] to request that.
 ///
 /// ```
 /// # use marked_yaml::*;
@@ -387,7 +436,11 @@ where
 
 /// Parse YAML from a string and return a Node representing
 /// the content.
+///
 /// Takes an additional LoaderOptions struct to control the behavior of the loader.
+///
+/// This is the way to parse a file with a top-level sequence instead of a mapping
+/// node.
 ///
 /// See `parse_yaml` for more information.
 pub fn parse_yaml_with_options<S>(
@@ -566,5 +619,21 @@ mod test {
         let err = parse_yaml(0, "{");
         assert!(err.is_err());
         assert!(format!("{}", err.err().unwrap()).starts_with("2:1: "));
+    }
+
+    #[test]
+    fn toplevel_sequence_wanted() {
+        let node =
+            parse_yaml_with_options(0, "[yaml]", LoaderOptions::default().toplevel_sequence())
+                .unwrap();
+        assert!(node.as_sequence().is_some());
+    }
+
+    #[test]
+    fn toplevel_sequence_wanted_got_mapping() {
+        assert_eq!(
+            parse_yaml_with_options(0, "{}", LoaderOptions::default().toplevel_sequence()),
+            Err(LoadError::TopLevelMustBeSequence(Marker::new(0, 1, 1)))
+        );
     }
 }
