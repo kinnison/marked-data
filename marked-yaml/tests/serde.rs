@@ -4,7 +4,10 @@
 
 use std::collections::HashMap;
 
-use marked_yaml::{from_node, from_yaml, parse_yaml, FromYamlError, Span, Spanned};
+use marked_yaml::{
+    from_node, from_yaml, from_yaml_with_options, parse_yaml, FromYamlError, LoaderOptions, Span,
+    Spanned,
+};
 use serde::Deserialize;
 
 const TEST_DOC: &str = r#"# Line one is a comment
@@ -13,7 +16,7 @@ top:
   - is always
   - two
   - strings
-u8s: [ 0, 1, 2, 255 ]
+u8s: [ 0, 1, 2, "255" ]
 i8s: [ -128, 0, 127 ]
 u32s: [ 65537 ]
 thingy: blue
@@ -118,4 +121,19 @@ fn parse_fails() {
     assert_eq!(s, "colour.Red: invalid type: map, expected String");
     #[cfg(not(feature = "serde-path"))]
     assert_eq!(s, "invalid type: map, expected String");
+}
+
+#[test]
+fn parse_fails_coerce() {
+    let options = LoaderOptions::default().prevent_coercion(true);
+    let err = from_yaml_with_options::<FullTest>(0, TEST_DOC, options)
+        .err()
+        .unwrap();
+    let s = format!("{err}");
+    #[cfg(feature = "serde-path")]
+    assert!(s.starts_with("u8s[3]"));
+    #[cfg(feature = "serde-path")]
+    let s = s.strip_prefix("u8s[3]: ").unwrap();
+    assert!(s.starts_with("invalid type: string"));
+    assert!(s.contains("expected u8"));
 }
