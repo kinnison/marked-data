@@ -291,7 +291,7 @@ impl MarkedEventReceiver for MarkedLoader {
                         let span = Span::new_start(mark);
                         let mut node = MarkedScalarNode::new(span, val);
                         if self.options.prevent_coercion {
-                            node.set_coerce(dbg!(matches!(kind, TScalarStyle::Plain)));
+                            node.set_coerce(matches!(kind, TScalarStyle::Plain));
                         }
                         match curstate {
                             MappingWaitingOnKey(mark, map) => {
