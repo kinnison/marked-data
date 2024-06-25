@@ -42,7 +42,8 @@ assert!(node.is_ok());
 Parsing a valid YAML file may fail because `marked_yaml` adds some
 additional constraints:
 
-- The top level of the YAML **MUST** be a mapping.
+- The top level of the YAML **MUST** be one of a mapping or a sequence. This is
+  controlled by the loader options.
 - Mapping keys **MUST** be scalars (strings).
 - Aliases and anchors **MAY NOT** be used (though this limit may be lifted in the future).
 
