@@ -1,11 +1,11 @@
 # Marked YAML
 
-This library builds atop [`yaml-rust`][yaml-rust] to provide a YAML AST which
+This library builds atop [`yaml-rust2`][yaml-rust2] to provide a YAML AST which
 includes the marks for where the YAML data comes from. It explicitly operates
 at a low level, providing only the _base_ **safe** YAML types (i.e. the vanilla
 tags `tag:yaml.org,2002:seq`, `tag:yaml.org,2002:map`, and `tag:yaml.org,2002:str`)
 
-[yaml-rust]: https://crates.io/crates/yaml-rust
+[yaml-rust2]: https://crates.io/crates/yaml-rust2
 
 The subset of YAML which is supported is quite deliberately limited in order
 that users of this crate will implicitly discourage complex use of YAML which
