@@ -621,7 +621,7 @@ where
     #[cfg(not(feature = "serde-path"))]
     {
         T::deserialize(NodeDeserializer::new(node)).map_err(|e| FromNodeError {
-            error: e,
+            error: Box::new(e),
             path: None,
         })
     }
