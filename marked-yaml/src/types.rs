@@ -813,6 +813,11 @@ Note: this also applies for deserializing nodes via serde.
             None
         }
     }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn is_empty_scalar(&self) -> bool {
+        self.value.is_empty() && self.may_coerce
+    }
 }
 
 impl<'a> From<&'a str> for MarkedScalarNode {

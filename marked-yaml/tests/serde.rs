@@ -137,3 +137,50 @@ fn parse_fails_coerce() {
     assert!(s.starts_with("invalid type: string"));
     assert!(s.contains("expected u8"));
 }
+
+#[test]
+fn empty_scalar_map() {
+    #[allow(dead_code)]
+    #[derive(Debug, Deserialize)]
+    struct Foo {
+        foo: HashMap<String, usize>,
+    }
+    let _: Foo = from_yaml(0, "foo:").unwrap();
+}
+
+#[test]
+fn empty_scalar_seq() {
+    #[allow(dead_code)]
+    #[derive(Debug, Deserialize)]
+    struct Foo {
+        foo: Vec<String>,
+    }
+    let _: Foo = from_yaml(0, "foo:").unwrap();
+}
+
+#[test]
+fn empty_scalar_unit() {
+    #[allow(dead_code)]
+    #[derive(Debug, Deserialize)]
+    struct Foo {
+        foo: (),
+    }
+    let _: Foo = from_yaml(0, "foo:").unwrap();
+}
+
+#[test]
+fn empty_scalar_struct_with_default() {
+    #[allow(dead_code)]
+    #[derive(Default, Debug, Deserialize)]
+    struct Bar {
+        buz: Option<String>,
+    }
+
+    #[allow(dead_code)]
+    #[derive(Debug, Deserialize)]
+    struct Foo {
+        #[serde(default)]
+        bar: Bar,
+    }
+    let _: Foo = from_yaml(0, "bar:").unwrap();
+}

@@ -1047,6 +1047,10 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
             return visitor.visit_map(SpannedDeserializer::new(self.node));
         }
 
+        if self.node.is_empty_scalar() {
+            return visitor.visit_map(EmptyMap);
+        }
+
         self.deserialize_any(visitor)
     }
 
@@ -1070,11 +1074,77 @@ impl<'de> Deserializer<'de> for MarkedScalarNodeDeserializer<'de> {
         visitor.visit_enum(self.node.as_str().into_deserializer())
     }
 
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if self.node.is_empty_scalar() {
+            return visitor.visit_map(EmptyMap);
+        }
+
+        self.deserialize_any(visitor)
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if self.node.is_empty_scalar() {
+            return visitor.visit_seq(EmptySeq);
+        }
+
+        self.deserialize_any(visitor)
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if self.node.is_empty_scalar() {
+            return visitor.visit_unit();
+        }
+
+        self.deserialize_any(visitor)
+    }
+
     forward_to_deserialize_any! [
-        char str string bytes byte_buf
-        unit unit_struct newtype_struct seq tuple tuple_struct map
+        char str string bytes byte_buf tuple
+        unit_struct newtype_struct tuple_struct
         identifier ignored_any
     ];
+}
+
+struct EmptyMap;
+
+impl<'de> MapAccess<'de> for EmptyMap {
+    type Error = Error; // FUTURE: change to never type once stable
+
+    fn next_key_seed<K>(&mut self, _seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: serde::de::DeserializeSeed<'de>,
+    {
+        Ok(None)
+    }
+
+    fn next_value_seed<V>(&mut self, _seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::DeserializeSeed<'de>,
+    {
+        unreachable!()
+    }
+}
+
+struct EmptySeq;
+
+impl<'de> SeqAccess<'de> for EmptySeq {
+    type Error = Error; // FUTURE: change to never type once stable
+
+    fn next_element_seed<T>(&mut self, _seed: T) -> Result<Option<T::Value>, Self::Error>
+    where
+        T: serde::de::DeserializeSeed<'de>,
+    {
+        Ok(None)
+    }
 }
 
 // -------------------------------------------------------------------------------
