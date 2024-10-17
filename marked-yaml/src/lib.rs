@@ -33,6 +33,7 @@
 #![cfg_attr(
     feature = "serde",
     doc = r#"
+## Serde
 
 Should you so choose, you may use serde to deserialise YAML
 strings directly into structures, any amount of which could be annotated
@@ -51,6 +52,9 @@ assert_eq!(roles["User"].span().start().copied(), Some(Marker::new(0, 2, 7)));
 
 You do not have to have all values [`Spanned`], and you can deserialize from an already
 parsed set of nodes with [`from_node`] instead.
+
+Empty scalars can be deserialized to empty sequences, maps, the unit type `()`
+and structs with a `#[serde(default)]` attribute.
 "#
 )]
 #![deny(missing_docs)]
