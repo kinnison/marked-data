@@ -253,7 +253,6 @@ mod spanned_tests {
     use serde::{forward_to_deserialize_any, Deserialize, Deserializer};
 
     #[test]
-    #[should_panic]
     fn spanned_always_map() {
         struct NotSpanned;
         impl<'de> Deserializer<'de> for NotSpanned {
@@ -273,7 +272,7 @@ mod spanned_tests {
             ];
         }
         type T = Spanned<bool>;
-        let _ = T::deserialize(NotSpanned);
+        assert!(T::deserialize(NotSpanned).is_err());
     }
 }
 
