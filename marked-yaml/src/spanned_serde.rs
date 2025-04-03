@@ -41,7 +41,7 @@ use crate::{
 /// You can also serialize these values,
 /// however when serializing you will lose the span information so do not expect
 /// to round-trip these values.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Spanned<T> {
     span: Span,
     inner: T,
