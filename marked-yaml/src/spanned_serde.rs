@@ -62,7 +62,7 @@ impl<T> Spanned<T> {
     ///
     /// ```
     /// # use marked_yaml::{Spanned, Span, Marker};
-    /// # let span = Span::new_start(Marker::new(0,1,2));
+    /// # let span = Span::new_start(Marker::new(0, 1, 1, 2));
     /// let spanned = Spanned::new(span, "Hello World");
     /// assert_eq!(spanned.span(), &span);
     /// ```
@@ -132,18 +132,22 @@ impl Borrow<str> for Spanned<&'_ str> {
 
 const SPANNED_TYPE: &str = "$___::marked_data::serde::Spanned<T>";
 const SPANNED_SPAN_START_SOURCE: &str = "$___::marked_data::serde::Spanned<T>::span_start_source";
+const SPANNED_SPAN_START_CHARACTER: &str = "$___::marked_data::serde::Spanned<T>::span_start_char";
 const SPANNED_SPAN_START_LINE: &str = "$___::marked_data::serde::Spanned<T>::span_start_line";
 const SPANNED_SPAN_START_COLUMN: &str = "$___::marked_data::serde::Spanned<T>::span_start_column";
 const SPANNED_SPAN_END_SOURCE: &str = "$___::marked_data::serde::Spanned<T>::span_end_source";
+const SPANNED_SPAN_END_CHARACTER: &str = "$___::marked_data::serde::Spanned<T>::span_end_char";
 const SPANNED_SPAN_END_LINE: &str = "$___::marked_data::serde::Spanned<T>::span_end_line";
 const SPANNED_SPAN_END_COLUMN: &str = "$___::marked_data::serde::Spanned<T>::span_end_column";
 const SPANNED_INNER: &str = "$___::marked_data::serde::Spanned<T>::inner";
 
-const SPANNED_FIELDS: [&str; 7] = [
+const SPANNED_FIELDS: [&str; 9] = [
     SPANNED_SPAN_START_SOURCE,
+    SPANNED_SPAN_START_CHARACTER,
     SPANNED_SPAN_START_LINE,
     SPANNED_SPAN_START_COLUMN,
     SPANNED_SPAN_END_SOURCE,
+    SPANNED_SPAN_END_CHARACTER,
     SPANNED_SPAN_END_LINE,
     SPANNED_SPAN_END_COLUMN,
     SPANNED_INNER,
@@ -177,6 +181,12 @@ where
 
                 let span_start = if key == Some(SPANNED_SPAN_START_SOURCE) {
                     let source: usize = visitor.next_value()?;
+                    if visitor.next_key()? != Some(SPANNED_SPAN_START_CHARACTER) {
+                        return Err(serde::de::Error::custom(
+                            "marked node span start character missing",
+                        ));
+                    }
+                    let character: usize = visitor.next_value()?;
                     if visitor.next_key()? != Some(SPANNED_SPAN_START_LINE) {
                         return Err(serde::de::Error::custom(
                             "marked node span start line missing",
@@ -190,13 +200,19 @@ where
                     }
                     let column: usize = visitor.next_value()?;
                     key = visitor.next_key()?;
-                    Some(Marker::new(source, line, column))
+                    Some(Marker::new(source, character, line, column))
                 } else {
                     None
                 };
 
                 let span_end = if key == Some(SPANNED_SPAN_END_SOURCE) {
                     let source: usize = visitor.next_value()?;
+                    if visitor.next_key()? != Some(SPANNED_SPAN_END_CHARACTER) {
+                        return Err(serde::de::Error::custom(
+                            "marked node span end character missing",
+                        ));
+                    }
+                    let character: usize = visitor.next_value()?;
                     if visitor.next_key()? != Some(SPANNED_SPAN_END_LINE) {
                         return Err(serde::de::Error::custom(
                             "marked node span end line missing",
@@ -210,7 +226,7 @@ where
                     }
                     let column: usize = visitor.next_value()?;
                     key = visitor.next_key()?;
-                    Some(Marker::new(source, line, column))
+                    Some(Marker::new(source, character, line, column))
                 } else {
                     None
                 };
@@ -834,9 +850,11 @@ struct SpannedDeserializer<'de, T> {
 
 enum SpannedDeserializerState {
     SendStartSource,
+    SendStartCharacter,
     SendStartLine,
     SendStartColumn,
     SendEndSource,
+    SendEndCharacter,
     SendEndLine,
     SendEndColumn,
     SendValue,
@@ -872,9 +890,11 @@ where
     {
         let key = match self.state {
             SpannedDeserializerState::SendStartSource => SPANNED_SPAN_START_SOURCE,
+            SpannedDeserializerState::SendStartCharacter => SPANNED_SPAN_START_CHARACTER,
             SpannedDeserializerState::SendStartLine => SPANNED_SPAN_START_LINE,
             SpannedDeserializerState::SendStartColumn => SPANNED_SPAN_START_COLUMN,
             SpannedDeserializerState::SendEndSource => SPANNED_SPAN_END_SOURCE,
+            SpannedDeserializerState::SendEndCharacter => SPANNED_SPAN_END_CHARACTER,
             SpannedDeserializerState::SendEndLine => SPANNED_SPAN_END_LINE,
             SpannedDeserializerState::SendEndColumn => SPANNED_SPAN_END_COLUMN,
             SpannedDeserializerState::SendValue => SPANNED_INNER,
@@ -896,6 +916,16 @@ where
                     .start()
                     .expect("Span missing start")
                     .source();
+                self.state = SpannedDeserializerState::SendStartCharacter;
+                seed.deserialize(v.into_deserializer())
+            }
+            SpannedDeserializerState::SendStartCharacter => {
+                let v = self
+                    .node
+                    .mark_span()
+                    .start()
+                    .expect("Span missing start")
+                    .character();
                 self.state = SpannedDeserializerState::SendStartLine;
                 seed.deserialize(v.into_deserializer())
             }
@@ -930,6 +960,16 @@ where
                     .end()
                     .expect("Span missing end")
                     .source();
+                self.state = SpannedDeserializerState::SendEndCharacter;
+                seed.deserialize(v.into_deserializer())
+            }
+            SpannedDeserializerState::SendEndCharacter => {
+                let v = self
+                    .node
+                    .mark_span()
+                    .end()
+                    .expect("Span missing end")
+                    .character();
                 self.state = SpannedDeserializerState::SendEndLine;
                 seed.deserialize(v.into_deserializer())
             }
@@ -1504,6 +1544,7 @@ shouting: TRUE
             Error::IntegerParseFailure(_e, s) => {
                 let start = s.start().unwrap();
                 assert_eq!(start.source(), 0);
+                assert_eq!(start.character(), 93);
                 assert_eq!(start.line(), 4);
                 assert_eq!(start.column(), 21);
             }

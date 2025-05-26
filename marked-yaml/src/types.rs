@@ -54,11 +54,12 @@ where
 /// let map = node.as_mapping().unwrap();
 /// let bar = map.get("foo").unwrap();
 /// // the "bar" string started on line 1, column 7 of source ID 100.
-/// assert_eq!(bar.span().start(), Some(&Marker::new(100, 1, 7)));
+/// assert_eq!(bar.span().start(), Some(&Marker::new(100, 6, 1, 7)));
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Marker {
     source: usize,
+    character: usize,
     line: usize,
     column: usize,
 }
@@ -72,14 +73,16 @@ impl Marker {
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// let marker = Marker::new(0, 1, 2);
+    /// let marker = Marker::new(0, 3, 1, 2);
     /// # assert_eq!(marker.source(), 0);
+    /// # assert_eq!(marker.character(), 3);
     /// # assert_eq!(marker.line(), 1);
     /// # assert_eq!(marker.column(), 2);
     /// ```
-    pub fn new(source: usize, line: usize, column: usize) -> Self {
+    pub fn new(source: usize, character: usize, line: usize, column: usize) -> Self {
         Self {
             source,
+            character,
             line,
             column,
         }
@@ -96,11 +99,27 @@ impl Marker {
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// # let marker = Marker::new(0, 1, 2);
+    /// # let marker = Marker::new(0, 3, 1, 2);
     /// assert_eq!(marker.source(), 0);
     /// ```
     pub fn source(&self) -> usize {
         self.source
+    }
+
+    /// The character index at which this marker resides
+    ///
+    /// When parsing YAML, we record where nodes start (and often finish).
+    /// This is the character index into the source text of where this
+    /// marker resides.  Character indices start with zero since they're
+    /// meant for software rather than humans.
+    ///
+    /// ```
+    /// # use marked_yaml::Marker;
+    /// # let marker = Marker::new(0, 3, 1, 2);
+    /// assert_eq!(marker.character(), 3);
+    /// ```
+    pub fn character(&self) -> usize {
+        self.character
     }
 
     /// The line number on which this marker resides, 1-indexed
@@ -111,7 +130,7 @@ impl Marker {
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// # let marker = Marker::new(0, 1, 2);
+    /// # let marker = Marker::new(0, 3, 1, 2);
     /// assert_eq!(marker.line(), 1);
     /// ```
     pub fn line(&self) -> usize {
@@ -126,7 +145,7 @@ impl Marker {
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// # let marker = Marker::new(0, 1, 2);
+    /// # let marker = Marker::new(0, 3, 1, 2);
     /// assert_eq!(marker.column(), 2);
     /// ```
     pub fn column(&self) -> usize {
@@ -142,7 +161,7 @@ impl Marker {
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// # let marker = Marker::new(0, 1, 2);
+    /// # let marker = Marker::new(0, 3, 1, 2);
     /// let rendered = marker.render(|_| "name");
     /// assert_eq!(format!("{}", rendered), "name:1:2")
     /// ```
@@ -162,7 +181,7 @@ impl Marker {
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// # let mut marker = Marker::new(0, 0, 0);
+    /// # let mut marker = Marker::new(0, 0, 0, 0);
     /// assert_ne!(marker.source(), 1);
     /// marker.set_source(1);
     /// assert_eq!(marker.source(), 1);
@@ -171,11 +190,25 @@ impl Marker {
         self.source = source;
     }
 
+    /// Set the character index for this marker
+    ///
+    ///
+    /// ```
+    /// # use marked_yaml::Marker;
+    /// # let mut marker = Marker::new(0, 0, 0, 0);
+    /// assert_ne!(marker.character(), 1);
+    /// marker.set_character(1);
+    /// assert_eq!(marker.character(), 1);
+    /// ```
+    pub fn set_character(&mut self, character: usize) {
+        self.character = character;
+    }
+
     /// Set the line number for this marker
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// # let mut marker = Marker::new(0, 0, 0);
+    /// # let mut marker = Marker::new(0, 0, 0, 0);
     /// assert_ne!(marker.line(), 1);
     /// marker.set_line(1);
     /// assert_eq!(marker.line(), 1);
@@ -188,7 +221,7 @@ impl Marker {
     ///
     /// ```
     /// # use marked_yaml::Marker;
-    /// # let mut marker = Marker::new(0, 0, 0);
+    /// # let mut marker = Marker::new(0, 0, 0, 0);
     /// assert_ne!(marker.column(), 1);
     /// marker.set_column(1);
     /// assert_eq!(marker.column(), 1);
@@ -210,7 +243,7 @@ impl Display for Marker {
 /// use marked_yaml::{parse_yaml, Marker, Span};
 /// let node = parse_yaml(100, "{foo: bar}").unwrap();
 /// let map = node.as_mapping().unwrap();
-/// assert_eq!(map.span(), &Span::new_with_marks(Marker::new(100, 1, 1), Marker::new(100, 1, 10)));
+/// assert_eq!(map.span(), &Span::new_with_marks(Marker::new(100, 0, 1, 1), Marker::new(100, 9, 1, 10)));
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Span {
@@ -245,8 +278,8 @@ impl Span {
     ///
     /// ```
     /// # use marked_yaml::{Marker, Span};
-    /// let span = Span::new_start(Marker::new(0, 1, 2));
-    /// # assert_eq!(span.start().unwrap(), &Marker::new(0, 1, 2));
+    /// let span = Span::new_start(Marker::new(0, 1, 1, 2));
+    /// # assert_eq!(span.start().unwrap(), &Marker::new(0, 1, 1, 2));
     /// # assert_eq!(span.end(), None);
     /// ```
     pub fn new_start(start: Marker) -> Self {
@@ -263,9 +296,9 @@ impl Span {
     ///
     /// ```
     /// # use marked_yaml::{Marker,Span};
-    /// let span = Span::new_with_marks(Marker::new(0, 1, 1), Marker::new(10, 2, 1));
-    /// # assert_eq!(span.start().unwrap(), &Marker::new(0, 1, 1));
-    /// # assert_eq!(span.end().unwrap(), &Marker::new(10, 2, 1));
+    /// let span = Span::new_with_marks(Marker::new(0, 0, 1, 1), Marker::new(10, 1, 2, 1));
+    /// # assert_eq!(span.start().unwrap(), &Marker::new(0, 0, 1, 1));
+    /// # assert_eq!(span.end().unwrap(), &Marker::new(10, 1, 2, 1));
     /// ```
     pub fn new_with_marks(start: Marker, end: Marker) -> Self {
         Self {
@@ -278,8 +311,8 @@ impl Span {
     ///
     /// ```
     /// # use marked_yaml::{Marker, Span};
-    /// # let span = Span::new_with_marks(Marker::new(0, 1, 1), Marker::new(10, 2, 1));
-    /// assert_eq!(span.start(), Some(&Marker::new(0, 1, 1)));
+    /// # let span = Span::new_with_marks(Marker::new(0, 0, 1, 1), Marker::new(10, 1, 2, 1));
+    /// assert_eq!(span.start(), Some(&Marker::new(0, 0, 1, 1)));
     /// ```
     pub fn start(&self) -> Option<&Marker> {
         self.start.as_ref()
@@ -289,8 +322,8 @@ impl Span {
     ///
     /// ```
     /// # use marked_yaml::{Marker, Span};
-    /// # let span = Span::new_with_marks(Marker::new(0, 1, 1), Marker::new(10, 2, 1));
-    /// assert_eq!(span.end(), Some(&Marker::new(10, 2, 1)));
+    /// # let span = Span::new_with_marks(Marker::new(0, 0, 1, 1), Marker::new(10, 1, 2, 1));
+    /// assert_eq!(span.end(), Some(&Marker::new(10, 1, 2, 1)));
     /// ```
     pub fn end(&self) -> Option<&Marker> {
         self.end.as_ref()
@@ -300,9 +333,9 @@ impl Span {
     ///
     /// ```
     /// # use marked_yaml::{Marker, Span};
-    /// # let mut span = Span::new_with_marks(Marker::new(0, 1, 1), Marker::new(10, 2, 1));
+    /// # let mut span = Span::new_with_marks(Marker::new(0, 0, 1, 1), Marker::new(10, 1, 2, 1));
     /// span.start_mut().unwrap().set_line(5);
-    /// assert_eq!(span.start(), Some(&Marker::new(0, 5, 1)));
+    /// assert_eq!(span.start(), Some(&Marker::new(0, 0, 5, 1)));
     /// ```
     pub fn start_mut(&mut self) -> Option<&mut Marker> {
         self.start.as_mut()
@@ -312,9 +345,9 @@ impl Span {
     ///
     /// ```
     /// # use marked_yaml::{Marker, Span};
-    /// # let mut span = Span::new_with_marks(Marker::new(0, 1, 1), Marker::new(10, 2, 1));
+    /// # let mut span = Span::new_with_marks(Marker::new(0, 0, 1, 1), Marker::new(10, 1, 2, 1));
     /// span.end_mut().unwrap().set_line(5);
-    /// assert_eq!(span.end(), Some(&Marker::new(10, 5, 1)));
+    /// assert_eq!(span.end(), Some(&Marker::new(10, 1, 5, 1)));
     /// ```
     pub fn end_mut(&mut self) -> Option<&mut Marker> {
         self.end.as_mut()
@@ -326,8 +359,8 @@ impl Span {
     /// # use marked_yaml::{Marker, Span};
     /// # let mut span = Span::new_blank();
     /// assert_eq!(span.start(), None);
-    /// span.set_start(Some(Marker::new(0, 1, 2)));
-    /// assert_eq!(span.start(), Some(&Marker::new(0, 1, 2)));
+    /// span.set_start(Some(Marker::new(0, 1, 1, 2)));
+    /// assert_eq!(span.start(), Some(&Marker::new(0, 1, 1, 2)));
     /// ```
     pub fn set_start(&mut self, start: Option<Marker>) {
         self.start = start;
@@ -339,8 +372,8 @@ impl Span {
     /// # use marked_yaml::{Marker, Span};
     /// # let mut span = Span::new_blank();
     /// assert_eq!(span.end(), None);
-    /// span.set_end(Some(Marker::new(0, 1, 2)));
-    /// assert_eq!(span.end(), Some(&Marker::new(0, 1, 2)));
+    /// span.set_end(Some(Marker::new(0, 1, 1, 2)));
+    /// assert_eq!(span.end(), Some(&Marker::new(0, 1, 1, 2)));
     /// ```
     pub fn set_end(&mut self, end: Option<Marker>) {
         self.end = end;
@@ -392,7 +425,7 @@ pub enum Node {
 /// let map = node.as_mapping().unwrap();
 /// let bar = map.get("foo").unwrap();
 /// // the "bar" string started on line 1, column 7 of source ID 100.
-/// assert_eq!(bar.span().start(), Some(&Marker::new(100, 1, 7)));
+/// assert_eq!(bar.span().start(), Some(&Marker::new(100, 6, 1, 7)));
 /// ```
 #[derive(Clone, Debug)]
 pub struct MarkedScalarNode {
@@ -418,7 +451,7 @@ pub(crate) type MappingHash = LinkedHashMap<MarkedScalarNode, Node>;
 /// use marked_yaml::{parse_yaml, Marker, Span};
 /// let node = parse_yaml(100, "{foo: bar}").unwrap();
 /// let map = node.as_mapping().unwrap();
-/// assert_eq!(map.span(), &Span::new_with_marks(Marker::new(100, 1, 1), Marker::new(100, 1, 10)));
+/// assert_eq!(map.span(), &Span::new_with_marks(Marker::new(100, 0, 1, 1), Marker::new(100, 9, 1, 10)));
 /// ```
 #[derive(Clone, Debug)]
 pub struct MarkedMappingNode {
@@ -439,7 +472,7 @@ pub struct MarkedMappingNode {
 /// let map = node.as_mapping().unwrap();
 /// let seq = map.get("foo").unwrap();
 /// let seq = seq.as_sequence().unwrap();
-/// assert_eq!(seq.span(), &Span::new_with_marks(Marker::new(100, 1, 7), Marker::new(100, 1, 11)));
+/// assert_eq!(seq.span(), &Span::new_with_marks(Marker::new(100, 6, 1, 7), Marker::new(100, 10, 1, 11)));
 /// ```
 #[derive(Clone, Debug)]
 pub struct MarkedSequenceNode {
@@ -538,8 +571,8 @@ assert_eq!(node.span(), &Span::new_blank());
 let mut node = "#,
                     stringify!($t),
                     r#"::new_empty(Span::new_blank());
-node.span_mut().set_start(Some(Marker::new(0, 1, 0)));
-assert_eq!(node.span().start(), Some(&Marker::new(0, 1, 0)));
+node.span_mut().set_start(Some(Marker::new(0, 0, 1, 0)));
+assert_eq!(node.span().start(), Some(&Marker::new(0, 0, 1, 0)));
 ```"#
                 ),
                 pub fn span_mut(&mut self) -> &mut Span {
@@ -578,8 +611,8 @@ impl Node {
     /// let mut node: Node = "foobar".into();
     /// let mut span = node.span_mut();
     /// assert_eq!(span.start(), None);
-    /// span.set_start(Some(Marker::new(0, 1, 0)));
-    /// assert_eq!(span.start(), Some(&Marker::new(0, 1, 0)));
+    /// span.set_start(Some(Marker::new(0, 0, 1, 0)));
+    /// assert_eq!(span.start(), Some(&Marker::new(0, 0, 1, 0)));
     /// ```
     pub fn span_mut(&mut self) -> &mut Span {
         match self {
@@ -1388,8 +1421,9 @@ mod test {
 
     #[test]
     fn basic_marker_checks() {
-        let marker = Marker::new(0, 1, 2);
+        let marker = Marker::new(0, 3, 1, 2);
         assert_eq!(marker.source(), 0);
+        assert_eq!(marker.character(), 3);
         assert_eq!(marker.line(), 1);
         assert_eq!(marker.column(), 2);
         assert_eq!(format!("{}", marker), "1:2");
@@ -1405,8 +1439,8 @@ mod test {
         let span = Span::new_blank();
         assert_eq!(span.start(), None);
         assert_eq!(span.end(), None);
-        let mark = Marker::new(0, 1, 2);
-        let mark2 = Marker::new(3, 4, 5);
+        let mark = Marker::new(0, 1, 1, 2);
+        let mark2 = Marker::new(3, 9, 4, 5);
         let span = Span::new_start(mark);
         assert_eq!(span.start(), Some(&mark));
         assert_eq!(span.end(), None);
@@ -1432,7 +1466,7 @@ mod test {
         // Now check the spans
         assert_eq!(node.span(), map.span());
         let seq = map.get_sequence("heterogenous").unwrap();
-        assert_eq!(seq.span().start(), Some(&Marker::new(0, 24, 3)));
+        assert_eq!(seq.span().start(), Some(&Marker::new(0, 431, 24, 3)));
         assert_eq!(seq.span(), map.get_node("heterogenous").unwrap().span());
         // Helpers for the sequence node
         assert_eq!(seq.get_node(0), seq.first());
