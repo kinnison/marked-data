@@ -49,3 +49,12 @@ additional constraints:
 
 In addition, you can convert between `marked_yaml::Node` and `yaml_rust::Yaml`
 though doing so will not give you any useful markers.
+
+# Using `serde` with `marked_yaml`
+
+If you want to use `marked-yaml` with your existing `serde` applications, you
+can enable the `serde-path` feature.
+
+If you do not need the errors produced by the `marked-yaml` deserializer to
+include nice paths to any problem, along with ensuring the marker for the
+problem area is populated in any errors, use the simpler `serde` feature.

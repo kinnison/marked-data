@@ -55,6 +55,11 @@ parsed set of nodes with [`from_node`] instead.
 
 Empty scalars can be deserialized to empty sequences, maps, the unit type `()`
 and structs with a `#[serde(default)]` attribute.
+
+### Error spans and paths
+
+If you want to have the error spans populated, along with string-form paths to
+errors in your YAML, then you can use the `serde-path` feature.
 "#
 )]
 #![deny(missing_docs)]
