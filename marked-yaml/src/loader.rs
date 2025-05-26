@@ -409,7 +409,7 @@ impl MarkedLoader {
     }
 
     fn marker(&self, mark: YamlMarker) -> Marker {
-        Marker::new(self.source, mark.line(), mark.col() + 1)
+        Marker::new(self.source, mark.index(), mark.line(), mark.col() + 1)
     }
 
     fn finish(mut self) -> Result<Node, LoadError> {
@@ -538,7 +538,7 @@ mod test {
         let err = parse_yaml(0, "foo");
         assert_eq!(
             err,
-            Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 1, 1)))
+            Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 0, 1, 1)))
         );
         assert!(format!("{}", err.err().unwrap()).contains("1:1: "));
     }
@@ -547,7 +547,7 @@ mod test {
     fn toplevel_is_sequence() {
         assert_eq!(
             parse_yaml(0, "[]"),
-            Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 1, 1)))
+            Err(LoadError::TopLevelMustBeMapping(Marker::new(0, 0, 1, 1)))
         );
     }
 
@@ -562,8 +562,8 @@ mod test {
         assert_eq!(
             err,
             Err(LoadError::DuplicateKey(Box::new(DuplicateKeyInner {
-                prev_key: MarkedScalarNode::new(Span::new_start(Marker::new(0, 1, 1)), "foo"),
-                key: MarkedScalarNode::new(Span::new_start(Marker::new(0, 1, 11)), "foo")
+                prev_key: MarkedScalarNode::new(Span::new_start(Marker::new(0, 0, 1, 1)), "foo"),
+                key: MarkedScalarNode::new(Span::new_start(Marker::new(0, 10, 1, 11)), "foo")
             })))
         );
 
@@ -581,7 +581,10 @@ mod test {
     #[test]
     fn unexpected_anchor() {
         let err = parse_yaml(0, "&foo {}");
-        assert_eq!(err, Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 6))));
+        assert_eq!(
+            err,
+            Err(LoadError::UnexpectedAnchor(Marker::new(0, 5, 1, 6)))
+        );
         assert!(format!("{}", err.err().unwrap()).starts_with("1:6: "));
     }
 
@@ -589,7 +592,7 @@ mod test {
     fn unexpected_anchor2() {
         assert_eq!(
             parse_yaml(0, "{bar: &foo []}"),
-            Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 12)))
+            Err(LoadError::UnexpectedAnchor(Marker::new(0, 11, 1, 12)))
         );
     }
 
@@ -597,7 +600,7 @@ mod test {
     fn unexpected_anchor3() {
         assert_eq!(
             parse_yaml(0, "{bar: &foo susan}"),
-            Err(LoadError::UnexpectedAnchor(Marker::new(0, 1, 12)))
+            Err(LoadError::UnexpectedAnchor(Marker::new(0, 11, 1, 12)))
         );
     }
 
@@ -606,7 +609,7 @@ mod test {
         let err = parse_yaml(0, "{? {} : {}}");
         assert_eq!(
             err,
-            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 4)))
+            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 3, 1, 4)))
         );
         assert!(format!("{}", err.err().unwrap()).starts_with("1:4: "));
     }
@@ -615,14 +618,17 @@ mod test {
     fn mapping_key_sequence() {
         assert_eq!(
             parse_yaml(0, "{? [] : {}}"),
-            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 4)))
+            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 3, 1, 4)))
         );
     }
 
     #[test]
     fn unexpected_tag() {
         let err = parse_yaml(0, "{foo: !!str bar}");
-        assert_eq!(err, Err(LoadError::UnexpectedTag(Marker::new(0, 1, 13))));
+        assert_eq!(
+            err,
+            Err(LoadError::UnexpectedTag(Marker::new(0, 12, 1, 13)))
+        );
         assert!(format!("{}", err.err().unwrap()).starts_with("1:13: "));
     }
 
@@ -630,7 +636,7 @@ mod test {
     fn nested_mapping_key_mapping() {
         assert_eq!(
             parse_yaml(0, "{foo: {? [] : {}}}"),
-            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 1, 10)))
+            Err(LoadError::MappingKeyMustBeScalar(Marker::new(0, 9, 1, 10)))
         );
     }
 
@@ -653,7 +659,7 @@ mod test {
     fn toplevel_sequence_wanted_got_mapping() {
         assert_eq!(
             parse_yaml_with_options(0, "{}", LoaderOptions::default().toplevel_sequence()),
-            Err(LoadError::TopLevelMustBeSequence(Marker::new(0, 1, 1)))
+            Err(LoadError::TopLevelMustBeSequence(Marker::new(0, 0, 1, 1)))
         );
     }
 

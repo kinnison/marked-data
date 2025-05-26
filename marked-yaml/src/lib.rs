@@ -47,7 +47,7 @@ let YAML = "Daniel: Author\nUser: Not Author\n";
 let roles: HashMap<Spanned<String>, Spanned<String>> = from_yaml(0, YAML).unwrap();
 
 assert_eq!(roles["Daniel"], "Author");
-assert_eq!(roles["User"].span().start().copied(), Some(Marker::new(0, 2, 7)));
+assert_eq!(roles["User"].span().start().copied(), Some(Marker::new(0, 21, 2, 7)));
 ```
 
 You do not have to have all values [`Spanned`], and you can deserialize from an already
