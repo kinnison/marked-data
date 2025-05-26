@@ -1313,7 +1313,7 @@ where
                 let mut iter = value.iter();
                 // Unwraps save because there's at least two spans here
                 let start = iter.next().unwrap().0.span().start;
-                let end = iter.last().unwrap().1.span().end;
+                let end = iter.next_back().unwrap().1.span().end;
                 Span { start, end }
             }
         };
