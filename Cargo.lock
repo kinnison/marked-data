@@ -61,7 +61,7 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "marked-yaml"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "doc-comment",
  "hashlink",
