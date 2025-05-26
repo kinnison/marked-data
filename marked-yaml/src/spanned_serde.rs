@@ -295,7 +295,6 @@ mod spanned_tests {
 // -------------------------------------------------------------------------------
 
 /// Errors which can come from deserialisation
-#[non_exhaustive]
 #[derive(Debug)]
 pub enum Error {
     /// The value was not a valid boolean

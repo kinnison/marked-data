@@ -23,7 +23,6 @@ pub struct DuplicateKeyInner {
 
 /// Errors which can occur during loading of YAML
 #[derive(Debug, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum LoadError {
     /// Something other than a mapping detected at the top level
     TopLevelMustBeMapping(Marker),
